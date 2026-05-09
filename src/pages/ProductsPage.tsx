@@ -324,8 +324,8 @@ export default function ProductsPage() {
                                 <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-lg" />
                               </div>
                             </PopoverTrigger>
-                            <PopoverContent side="right" align="start" className="p-1 w-64 h-64 border-none shadow-2xl rounded-2xl overflow-hidden bg-transparent">
-                              <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-xl" />
+                            <PopoverContent side="right" align="start" className="p-1 w-80 border-none shadow-2xl rounded-2xl overflow-hidden bg-background/95 backdrop-blur-sm">
+                              <img src={p.imageUrl} alt={p.name} className="w-full h-auto max-h-[400px] object-contain rounded-xl" />
                             </PopoverContent>
                           </Popover>
                         ) : (
