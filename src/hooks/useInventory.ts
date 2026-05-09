@@ -57,17 +57,24 @@ export function useInventory() {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
       setProducts(data);
       setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
+    }, (error) => {
+      setLoading(false);
+      handleFirestoreError(error, OperationType.LIST, 'products');
+    });
 
     const unsubCategories = onSnapshot(categoriesQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
       setCategories(data);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'categories'));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'categories');
+    });
 
     const unsubTransactions = onSnapshot(transactionsQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
       setTransactions(data);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'transactions'));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'transactions');
+    });
 
     return () => {
       unsubProducts();
