@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
+import { Toaster } from './components/ui/sonner';
 import TransactionsPage from './pages/TransactionsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Router>
+        <Toaster />
       </AuthProvider>
     </ThemeProvider>
   );
