@@ -1,0 +1,6 @@
+{
+  "name": "StockPro Inventory Manager",
+  "description": "A modern, full-stack inventory management system with real-time tracking, analytics, and professional dashboard features.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
