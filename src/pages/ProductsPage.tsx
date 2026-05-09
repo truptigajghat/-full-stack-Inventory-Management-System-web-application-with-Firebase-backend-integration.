@@ -51,6 +51,7 @@ import {
 } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { toast } from 'sonner';
 import { Product } from '../types';
 import jsPDF from 'jspdf';
@@ -66,6 +67,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [stockModalProduct, setStockModalProduct] = useState<Product | null>(null);
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
+  const [hoveredProductId, setHoveredProductId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -310,17 +312,26 @@ export default function ProductsPage() {
                 <TableRow key={p.id} className="group">
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="relative group/img h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                      <div className="h-10 w-10">
                         {p.imageUrl ? (
-                          <>
-                            <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-lg cursor-pointer" />
-                            {/* Hover Preview */}
-                            <div className="absolute left-12 top-0 z-50 hidden group-hover/img:block w-48 h-48 bg-background border rounded-xl shadow-2xl p-1 animate-in fade-in zoom-in duration-200">
-                              <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-lg" />
-                            </div>
-                          </>
+                          <Popover open={hoveredProductId === p.id} onOpenChange={(open) => !open && setHoveredProductId(null)}>
+                            <PopoverTrigger asChild>
+                              <div 
+                                className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center cursor-pointer group/img"
+                                onMouseEnter={() => setHoveredProductId(p.id)}
+                                onMouseLeave={() => setHoveredProductId(null)}
+                              >
+                                <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-lg" />
+                              </div>
+                            </PopoverTrigger>
+                            <PopoverContent side="right" align="start" className="p-1 w-64 h-64 border-none shadow-2xl rounded-2xl overflow-hidden bg-transparent">
+                              <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-xl" />
+                            </PopoverContent>
+                          </Popover>
                         ) : (
-                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
                         )}
                       </div>
                       <div className="cursor-pointer" onClick={() => setViewProduct(p)}>
