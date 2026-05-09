@@ -30,7 +30,7 @@ import { format } from 'date-fns';
 import { cn } from '../lib/utils';
 
 export default function Dashboard() {
-  const { products, transactions, loading } = useInventory();
+  const { products, transactions, loading, error } = useInventory();
 
   const totalProducts = products.length;
   const totalStock = products.reduce((acc, p) => acc + p.quantity, 0);
@@ -57,6 +57,16 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pb-10">
+      {error && (
+        <div className="bg-destructive/10 text-destructive p-4 rounded-xl flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5" />
+          <p className="text-sm font-medium">
+            {error.includes('index') 
+              ? 'Database indexes are still building. Please wait 1-2 minutes for Firebase to finish.' 
+              : error}
+          </p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>

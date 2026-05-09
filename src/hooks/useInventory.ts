@@ -23,6 +23,7 @@ export function useInventory() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -57,23 +58,25 @@ export function useInventory() {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
       setProducts(data);
       setLoading(false);
-    }, (error) => {
+      setError(null);
+    }, (err) => {
       setLoading(false);
-      handleFirestoreError(error, OperationType.LIST, 'products');
+      setError(err.message);
+      console.error('Products query error:', err);
     });
 
     const unsubCategories = onSnapshot(categoriesQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
       setCategories(data);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'categories');
+    }, (err) => {
+      console.error('Categories query error:', err);
     });
 
     const unsubTransactions = onSnapshot(transactionsQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
       setTransactions(data);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'transactions');
+    }, (err) => {
+      console.error('Transactions query error:', err);
     });
 
     return () => {
@@ -205,6 +208,7 @@ export function useInventory() {
     adjustStock,
     addCategory,
     deleteCategory,
-    uploadImage
+    uploadImage,
+    error
   };
 }

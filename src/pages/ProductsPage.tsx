@@ -52,7 +52,7 @@ import { StockActionModal } from '../components/inventory/StockActionModal';
 import { cn } from '../lib/utils';
 
 export default function ProductsPage() {
-  const { products, categories, addProduct, updateProduct, deleteProduct, uploadImage, loading } = useInventory();
+  const { products, categories, addProduct, updateProduct, deleteProduct, uploadImage, loading, error } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadingLocal, setLoadingLocal] = useState(false);
@@ -127,6 +127,16 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-destructive/10 text-destructive p-4 rounded-xl flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5" />
+          <p className="text-sm font-medium">
+            {error.includes('index') 
+              ? 'Database indexes are still building. Please wait 1-2 minutes for Firebase to finish.' 
+              : error}
+          </p>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Products</h1>
