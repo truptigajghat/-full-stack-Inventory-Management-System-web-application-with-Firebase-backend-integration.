@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { useInventory } from '../hooks/useInventory';
 import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Edit2, 
-  Trash2, 
+  Plus,
   Download, 
-  ArrowUpDown,
-  Image as ImageIcon,
-  AlertCircle,
-  ArrowLeftRight
+  Search, 
+  LayoutGrid, 
+  List as ListIcon, 
+  MoreHorizontal, 
+  Trash2, 
+  Edit, 
+  History, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  AlertTriangle,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -49,11 +51,14 @@ import { StockActionModal } from '../components/inventory/StockActionModal';
 import { cn } from '../lib/utils';
 
 export default function ProductsPage() {
-  const { products, categories, addProduct, updateProduct, deleteProduct, loading } = useInventory();
+  const { products, categories, addProduct, updateProduct, deleteProduct, uploadImage, loading } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loadingLocal, setLoadingLocal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [stockModalProduct, setStockModalProduct] = useState<Product | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -63,8 +68,21 @@ export default function ProductsPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoadingLocal(true);
     const formData = new FormData(e.currentTarget);
     
+    let imageUrl = editingProduct?.imageUrl || '';
+    if (selectedFile) {
+      try {
+        const uploadedUrl = await uploadImage(selectedFile);
+        if (uploadedUrl) imageUrl = uploadedUrl;
+      } catch (error: any) {
+        toast.error('Failed to upload image');
+        setLoadingLocal(false);
+        return;
+      }
+    }
+
     const productData = {
       name: formData.get('name') as string,
       sku: formData.get('sku') as string,
@@ -73,6 +91,7 @@ export default function ProductsPage() {
       quantity: Number(formData.get('quantity')),
       minQuantity: Number(formData.get('minQuantity')),
       category: formData.get('category') as string,
+      imageUrl,
     };
 
     try {
@@ -85,8 +104,12 @@ export default function ProductsPage() {
       }
       setIsModalOpen(false);
       setEditingProduct(null);
+      setSelectedFile(null);
+      setImagePreview(null);
     } catch (error: any) {
       toast.error(error.message);
+    } finally {
+      setLoadingLocal(false);
     }
   };
 
@@ -116,7 +139,11 @@ export default function ProductsPage() {
           </Button>
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <DialogTrigger asChild>
-              <Button className="rounded-full shadow-lg shadow-primary/20" onClick={() => setEditingProduct(null)}>
+              <Button className="rounded-full shadow-lg shadow-primary/20" onClick={() => { 
+                setEditingProduct(null);
+                setSelectedFile(null);
+                setImagePreview(null);
+              }}>
                 <Plus className="mr-2 h-4 w-4" />
                 New Product
               </Button>
@@ -161,13 +188,51 @@ export default function ProductsPage() {
                     <Input id="minQuantity" name="minQuantity" type="number" defaultValue={editingProduct?.minQuantity} required />
                   </div>
                   <div className="space-y-2 col-span-2">
+                    <Label htmlFor="image">Product Image</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-muted-foreground/25">
+                        {imagePreview || editingProduct?.imageUrl ? (
+                          <img 
+                            src={imagePreview || editingProduct?.imageUrl} 
+                            alt="Preview" 
+                            className="h-full w-full object-cover" 
+                          />
+                        ) : (
+                          <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <Input 
+                          id="image" 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSelectedFile(file);
+                              const reader = new FileReader();
+                              reader.onloadend = () => setImagePreview(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="cursor-pointer"
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Recommended: Square image, max 2MB
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 col-span-2">
                     <Label htmlFor="description">Description</Label>
                     <Input id="description" name="description" defaultValue={editingProduct?.description} />
                   </div>
                 </div>
                 <DialogFooter className="mt-6">
                   <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                  <Button type="submit">Save Product</Button>
+                  <Button type="submit" disabled={loadingLocal}>
+                    {loadingLocal ? 'Saving...' : 'Save Product'}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>

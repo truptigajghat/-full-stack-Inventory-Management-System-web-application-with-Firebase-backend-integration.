@@ -12,7 +12,8 @@ import {
   orderBy,
   limit
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../lib/firebase';
 import { Product, Category, Transaction } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
@@ -162,6 +163,19 @@ export function useInventory() {
     }
   };
 
+  const uploadImage = async (file: File) => {
+    if (!user) return null;
+    try {
+      const storageRef = ref(storage, `products/${user.uid}/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      return url;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
+
   return {
     products,
     categories,
@@ -172,6 +186,7 @@ export function useInventory() {
     deleteProduct,
     adjustStock,
     addCategory,
-    deleteCategory
+    deleteCategory,
+    uploadImage
   };
 }
