@@ -8,11 +8,14 @@ import {
   LayoutGrid, 
   List as ListIcon, 
   MoreHorizontal, 
+  MoreVertical,
   Trash2, 
   Edit, 
+  Edit2,
   History, 
   ArrowUpRight, 
   ArrowDownLeft, 
+  ArrowLeftRight,
   AlertTriangle,
   Image as ImageIcon
 } from 'lucide-react';
