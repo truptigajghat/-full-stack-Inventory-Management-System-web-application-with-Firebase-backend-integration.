@@ -17,7 +17,9 @@ import {
   ArrowDownLeft, 
   ArrowLeftRight,
   AlertTriangle,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -61,6 +63,7 @@ export default function ProductsPage() {
   const [loadingLocal, setLoadingLocal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [stockModalProduct, setStockModalProduct] = useState<Product | null>(null);
+  const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -177,15 +180,27 @@ export default function ProductsPage() {
                     <Input id="sku" name="sku" defaultValue={editingProduct?.sku} placeholder="WM-001" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="category">Category</Label>
+                      {categories.length === 0 && (
+                        <Link to="/categories" className="text-[10px] text-primary hover:underline flex items-center gap-1">
+                          <Plus className="h-2 w-2" /> Add New
+                        </Link>
+                      )}
+                    </div>
                     <Select name="category" defaultValue={editingProduct?.category}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select Category" />
+                        <SelectValue placeholder={categories.length === 0 ? "No categories found" : "Select Category"} />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map(c => (
                           <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                         ))}
+                        {categories.length === 0 && (
+                          <div className="p-2 text-xs text-center text-muted-foreground">
+                            Go to Categories page to add some!
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -290,15 +305,21 @@ export default function ProductsPage() {
                 <TableRow key={p.id} className="group">
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                      <div className="relative group/img h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
                         {p.imageUrl ? (
-                          <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-lg" referrerPolicy="no-referrer" />
+                          <>
+                            <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-lg cursor-pointer" />
+                            {/* Hover Preview */}
+                            <div className="absolute left-12 top-0 z-50 hidden group-hover/img:block w-48 h-48 bg-background border rounded-xl shadow-2xl p-1 animate-in fade-in zoom-in duration-200">
+                              <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-lg" />
+                            </div>
+                          </>
                         ) : (
                           <ImageIcon className="h-5 w-5 text-muted-foreground" />
                         )}
                       </div>
-                      <div>
-                        <p className="font-medium">{p.name}</p>
+                      <div className="cursor-pointer" onClick={() => setViewProduct(p)}>
+                        <p className="font-medium group-hover:text-primary transition-colors">{p.name}</p>
                         <p className="text-xs text-muted-foreground uppercase">{p.sku}</p>
                       </div>
                     </div>
@@ -341,6 +362,10 @@ export default function ProductsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setViewProduct(p)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => { setEditingProduct(p); setIsModalOpen(true); }}>
                             <Edit2 className="mr-2 h-4 w-4" />
                             Edit
@@ -384,6 +409,72 @@ export default function ProductsPage() {
         isOpen={!!stockModalProduct}
         onClose={() => setStockModalProduct(null)}
       />
+
+      {/* View Product Modal */}
+      <Dialog open={!!viewProduct} onOpenChange={() => setViewProduct(null)}>
+        <DialogContent className="sm:max-w-[600px] overflow-hidden p-0 rounded-3xl border-none">
+          {viewProduct && (
+            <div className="flex flex-col md:flex-row">
+              <div className="w-full md:w-1/2 h-64 md:h-auto bg-muted flex items-center justify-center overflow-hidden">
+                {viewProduct.imageUrl ? (
+                  <img src={viewProduct.imageUrl} alt={viewProduct.name} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <ImageIcon className="h-12 w-12" />
+                    <span className="text-xs">No image available</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 p-8 space-y-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="font-normal">{viewProduct.category}</Badge>
+                    <Badge className={cn(
+                      "border-none",
+                      viewProduct.quantity === 0 ? "bg-rose-500/10 text-rose-500" : 
+                      viewProduct.quantity <= viewProduct.minQuantity ? "bg-amber-500/10 text-amber-500" : 
+                      "bg-emerald-500/10 text-emerald-500"
+                    )}>
+                      {viewProduct.quantity === 0 ? "Out of Stock" : 
+                       viewProduct.quantity <= viewProduct.minQuantity ? "Low Stock" : 
+                       "In Stock"}
+                    </Badge>
+                  </div>
+                  <h2 className="text-3xl font-bold tracking-tight">{viewProduct.name}</h2>
+                  <p className="text-sm text-muted-foreground uppercase font-mono mt-1">SKU: {viewProduct.sku}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 py-6 border-y border-muted">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Price</p>
+                    <p className="text-2xl font-bold text-primary">${viewProduct.price.toFixed(2)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Current Stock</p>
+                    <p className="text-2xl font-bold">{viewProduct.quantity} units</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase">Description</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {viewProduct.description || "No description provided for this product."}
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button className="flex-1 rounded-full" onClick={() => { setEditingProduct(viewProduct); setIsModalOpen(true); setViewProduct(null); }}>
+                    <Edit className="mr-2 h-4 w-4" /> Edit Product
+                  </Button>
+                  <Button variant="outline" size="icon" className="rounded-full" onClick={() => setViewProduct(null)}>
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
