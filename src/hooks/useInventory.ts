@@ -12,8 +12,7 @@ import {
   orderBy,
   limit
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { Product, Category, Transaction } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
@@ -166,13 +165,25 @@ export function useInventory() {
   const uploadImage = async (file: File) => {
     if (!user) return null;
     try {
-      const storageRef = ref(storage, `products/${user.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      return url;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'jb2vsvny');
+      formData.append('cloud_name', 'dd2gxxwqy');
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/dd2gxxwqy/image/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) throw new Error('Upload failed');
+      const data = await response.json();
+      return data.secure_url;
     } catch (error) {
-      console.error('Error uploading image:', error);
-      throw new Error('Failed to upload image');
+      console.error('Error uploading to Cloudinary:', error);
+      throw new Error('Failed to upload image to Cloudinary');
     }
   };
 
