@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useInventory } from '../hooks/useInventory';
 import { 
   Plus,
@@ -46,6 +47,7 @@ import {
   DialogTitle, 
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -168,6 +170,9 @@ export default function ProductsPage() {
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+                <DialogDescription>
+                  {editingProduct ? 'Update product details and stock information.' : 'Enter the details for your new inventory item.'}
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -413,6 +418,10 @@ export default function ProductsPage() {
       {/* View Product Modal */}
       <Dialog open={!!viewProduct} onOpenChange={() => setViewProduct(null)}>
         <DialogContent className="sm:max-w-[600px] overflow-hidden p-0 rounded-3xl border-none">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{viewProduct?.name || 'Product Details'}</DialogTitle>
+            <DialogDescription>Full details and stock information for this product.</DialogDescription>
+          </DialogHeader>
           {viewProduct && (
             <div className="flex flex-col md:flex-row">
               <div className="w-full md:w-1/2 h-64 md:h-auto bg-muted flex items-center justify-center overflow-hidden">
