@@ -49,7 +49,14 @@ export default async function handler(req: any, res: any) {
     }
 
     const data = await response.json();
-    const products = data.products || [];
+    const products = (data.products || []).filter((p: any) => {
+      const title = (p.title || '').toLowerCase();
+      // Filter out non-inventory items commonly used in Shopify
+      return !title.includes('partial payment') && 
+             !title.includes('deposit') && 
+             !title.includes('shipping fee') &&
+             !title.includes('gift card');
+    });
     
     // Parse Link header for next page info
     const linkHeader = response.headers.get('Link') || response.headers.get('link');

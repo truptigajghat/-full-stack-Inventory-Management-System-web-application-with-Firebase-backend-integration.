@@ -224,6 +224,21 @@ export default function ProductsPage() {
         }
       } while (nextPageInfo);
       
+      // EXHAUSTIVE CLEANUP: Delete any Shopify products that were not part of this sync session
+      // This removes filtered items like "Partial Payment" or products deleted from Shopify.
+      const productsToDelete = products.filter(p => 
+        (p.source === 'shopify' || (p.sku && p.sku.startsWith('SHOPIFY-'))) && 
+        !syncedIds.has(p.id)
+      );
+      
+      if (productsToDelete.length > 0) {
+        toast.info(`Finalizing cleanup of ${productsToDelete.length} items...`);
+        for (let i = 0; i < productsToDelete.length; i += 5) {
+          const chunk = productsToDelete.slice(i, i + 5);
+          await Promise.all(chunk.map(p => deleteProduct(p.id)));
+        }
+      }
+      
       toast.success(`Full sync complete! Total unique products: ${syncedIds.size}`);
     } catch (error: any) {
       toast.error(`Sync failed: ${error.message}`);
