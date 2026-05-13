@@ -159,7 +159,7 @@ export default function ProductsPage() {
 
     try {
       do {
-        const url = `/api/sync-shopify${nextPageInfo ? `?page_info=${nextPageInfo}` : ''}`;
+        const url = `/api/sync-shopify${nextPageInfo ? `?page_info=${encodeURIComponent(nextPageInfo)}` : ''}`;
         const response = await fetch(url, {
           headers: {
             'x-shopify-domain': shopifySettings.domain,
