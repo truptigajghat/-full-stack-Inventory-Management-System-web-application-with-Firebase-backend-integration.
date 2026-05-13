@@ -19,6 +19,7 @@ export default async function handler(req: any, res: any) {
 
   const SHOPIFY_STORE_DOMAIN = req.headers['x-shopify-domain'];
   const SHOPIFY_ACCESS_TOKEN = req.headers['x-shopify-token'];
+  const PAGE_INFO = req.query.page_info;
 
   if (!SHOPIFY_STORE_DOMAIN || !SHOPIFY_ACCESS_TOKEN) {
     return res.status(400).json({ 
@@ -27,87 +28,66 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    let allProducts: any[] = [];
-    let url: string | null = `https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/products.json?limit=250&status=active`;
+    let url = `https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/products.json?limit=250&status=active`;
+    
+    // If page_info is provided, we must only use page_info and limit
+    if (PAGE_INFO) {
+      url = `https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/products.json?limit=250&page_info=${PAGE_INFO}`;
+    }
 
-    while (url) {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN as string,
-        },
-      });
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN as string,
+      },
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Shopify API responded with ${response.status}: ${errorText}`);
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Shopify API responded with ${response.status}: ${errorText}`);
+    }
 
-      const data = await response.json();
-      if (data.products && Array.isArray(data.products)) {
-        allProducts = [...allProducts, ...data.products];
-        console.log(`Successfully fetched page. Subtotal: ${allProducts.length} products.`);
-      }
-      
-      // Robust Link header parsing
-      const linkHeader = response.headers.get('Link') || response.headers.get('link');
-      let nextUrl = null;
-      
-      if (linkHeader) {
-        // Shopify Link header: <url>; rel="next", <url>; rel="previous"
-        const links = linkHeader.split(',');
-        for (const link of links) {
-          const [urlPart, relPart] = link.split(';');
-          if (relPart && relPart.includes('next')) {
-            const match = urlPart.match(/<([^>]+)>/);
-            if (match) {
-              nextUrl = match[1];
-              break;
-            }
-          }
+    const data = await response.json();
+    const products = data.products || [];
+    
+    // Parse Link header for next page info
+    const linkHeader = response.headers.get('Link') || response.headers.get('link');
+    let nextPageInfo = null;
+    
+    if (linkHeader) {
+      const parts = linkHeader.split(',');
+      for (const part of parts) {
+        if (part.includes('rel="next"')) {
+          const match = part.match(/page_info=([^&>]+)/);
+          if (match) nextPageInfo = match[1];
         }
       }
-      
-      url = nextUrl;
-      
-      // Add a small delay to avoid Shopify rate limits (2 req/sec)
-      if (url) {
-        console.log(`Next page found. Waiting 500ms...`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
     }
-    
-    // Transform Shopify products to match our app's Product format
+
+    // Transform variants
     const transformedProducts: any[] = [];
-    
-    for (const p of allProducts) {
-      // Create a separate product entry for each variant (Size, Color, etc.)
-      // This is essential for fashion stores
+    for (const p of products) {
       const variants = p.variants || [];
       for (const variant of variants) {
-        // Use variant-specific image if available, fallback to main product image
         const variantImage = p.images?.find((img: any) => img.variant_ids?.includes(variant.id))?.src || p.image?.src || '';
         
         transformedProducts.push({
           name: variant.title === 'Default Title' ? p.title : `${p.title} - ${variant.title}`,
           sku: variant.sku || `SHOPIFY-${p.id}-${variant.id}`,
-          description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '', // strip HTML tags
+          description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '',
           price: parseFloat(variant.price || '0'),
-          quantity: 0, // Default to 0, will be managed in Firebase
-          minQuantity: 5, // default
+          quantity: 0,
+          minQuantity: 5,
           category: p.product_type || 'Uncategorized',
           imageUrl: variantImage,
         });
       }
     }
 
-    console.log(`Sync complete. Total Shopify products: ${allProducts.length}, Total variants transformed: ${transformedProducts.length}`);
-
     return res.status(200).json({ 
       products: transformedProducts,
-      totalShopifyProducts: allProducts.length,
-      totalVariants: transformedProducts.length
+      nextPageInfo
     });
     
   } catch (error: any) {

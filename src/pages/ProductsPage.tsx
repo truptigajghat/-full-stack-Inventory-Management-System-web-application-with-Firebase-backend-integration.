@@ -151,65 +151,69 @@ export default function ProductsPage() {
     }
 
     setIsSyncingShopify(true);
+    let added = 0;
+    let updated = 0;
+    let nextPageInfo = null;
+    let totalSynced = 0;
+    const processedSkus = new Set();
+
     try {
-      const response = await fetch('/api/sync-shopify', {
-        headers: {
-          'x-shopify-domain': shopifySettings.domain,
-          'x-shopify-token': shopifySettings.token
-        }
-      });
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to fetch from Shopify');
-      }
-      
-      const data = await response.json();
-      const shopifyProducts = data.products || [];
-      const totalVariants = data.totalVariants || shopifyProducts.length;
-      
-      toast.info(`Received ${totalVariants} products/variants from Shopify. Syncing to database...`);
-      
-      if (shopifyProducts.length === 0) {
-        toast.info('No products found on Shopify.');
-        setIsSyncingShopify(false);
-        return;
-      }
-      
-      let added = 0;
-      let updated = 0;
-      const processedSkus = new Set();
-      
-      // Process products in parallel batches for speed
-      const batchSize = 10;
-      for (let i = 0; i < shopifyProducts.length; i += batchSize) {
-        const chunk = shopifyProducts.slice(i, i + batchSize);
-        const results = await Promise.all(chunk.map(async (sp: any) => {
-          if (processedSkus.has(sp.sku)) return null;
-          processedSkus.add(sp.sku);
-
-          const existingProduct = products.find(p => p.sku === sp.sku);
-          if (existingProduct) {
-            await updateProduct(existingProduct.id, {
-              name: sp.name,
-              imageUrl: sp.imageUrl || existingProduct.imageUrl,
-            });
-            return 'updated';
-          } else {
-            await addProduct({
-              ...sp,
-              quantity: 0
-            });
-            return 'added';
+      do {
+        const url = `/api/sync-shopify${nextPageInfo ? `?page_info=${nextPageInfo}` : ''}`;
+        const response = await fetch(url, {
+          headers: {
+            'x-shopify-domain': shopifySettings.domain,
+            'x-shopify-token': shopifySettings.token
           }
-        }));
-
-        results.forEach(res => {
-          if (res === 'updated') updated++;
-          if (res === 'added') added++;
         });
-      }
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to fetch from Shopify');
+        }
+
+        const data = await response.json();
+        const shopifyProducts = data.products || [];
+        nextPageInfo = data.nextPageInfo;
+        totalSynced += shopifyProducts.length;
+
+        if (shopifyProducts.length > 0) {
+          toast.info(`Fetching batch... (${totalSynced} items found so far)`);
+          
+          // Process products in parallel batches for speed
+          const batchSize = 10;
+          for (let i = 0; i < shopifyProducts.length; i += batchSize) {
+            const chunk = shopifyProducts.slice(i, i + batchSize);
+            const results = await Promise.all(chunk.map(async (sp: any) => {
+              if (processedSkus.has(sp.sku)) return null;
+              processedSkus.add(sp.sku);
+
+              // Check existing products (from initial state)
+              const existingProduct = products.find(p => p.sku === sp.sku);
+              if (existingProduct) {
+                await updateProduct(existingProduct.id, {
+                  name: sp.name,
+                  imageUrl: sp.imageUrl || existingProduct.imageUrl,
+                });
+                return 'updated';
+              } else {
+                await addProduct({
+                  ...sp,
+                  quantity: 0
+                });
+                return 'added';
+              }
+            }));
+
+            results.forEach(res => {
+              if (res === 'updated') updated++;
+              if (res === 'added') added++;
+            });
+          }
+        }
+      } while (nextPageInfo);
       
-      toast.success(`Sync complete! Total items: ${totalVariants} (New: ${added}, Updated: ${updated})`);
+      toast.success(`Full sync complete! Total items processed: ${totalSynced} (New: ${added}, Updated: ${updated})`);
     } catch (error: any) {
       toast.error(`Sync failed: ${error.message}`);
     } finally {
