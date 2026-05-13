@@ -45,31 +45,31 @@ export default async function handler(req: any, res: any) {
       }
 
       const data = await response.json();
-      if (data.products) {
+      if (data.products && Array.isArray(data.products)) {
         allProducts = [...allProducts, ...data.products];
       }
-      console.log(`Fetched page: ${data.products?.length || 0} products. Total: ${allProducts.length}`);
+      
+      console.log(`Fetched page. Current total: ${allProducts.length}`);
 
-      // Ultra-robust parsing for Shopify Link header
+      // Shopify Link header parsing
       const linkHeader = response.headers.get('Link') || response.headers.get('link');
       let nextUrl = null;
       
       if (linkHeader) {
-        // Shopify Link header looks like: <url>; rel="next", <url>; rel="previous"
-        const links = linkHeader.split(',');
-        for (const link of links) {
-          const [urlPart, relPart] = link.split(';');
-          if (relPart && relPart.includes('rel="next"')) {
-            const match = urlPart.match(/<([^>]+)>/);
+        // Example: <https://...>; rel="next", <https://...>; rel="previous"
+        const parts = linkHeader.split(',');
+        for (const part of parts) {
+          if (part.includes('rel="next"')) {
+            const match = part.match(/<([^>]+)>/);
             if (match) {
               nextUrl = match[1];
+              break;
             }
           }
         }
       }
       
       url = nextUrl;
-      if (url) console.log(`Following next page: ${url}`);
     }
     
     // Transform Shopify products to match our app's Product format
@@ -96,7 +96,13 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    return res.status(200).json({ products: transformedProducts });
+    console.log(`Sync complete. Total Shopify products: ${allProducts.length}, Total variants transformed: ${transformedProducts.length}`);
+
+    return res.status(200).json({ 
+      products: transformedProducts,
+      totalShopifyProducts: allProducts.length,
+      totalVariants: transformedProducts.length
+    });
     
   } catch (error: any) {
     console.error('Error fetching from Shopify:', error);

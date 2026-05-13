@@ -165,7 +165,9 @@ export default function ProductsPage() {
       
       const data = await response.json();
       const shopifyProducts = data.products || [];
-      toast.info(`Received ${shopifyProducts.length} products from Shopify. Syncing to database...`);
+      const totalVariants = data.totalVariants || shopifyProducts.length;
+      
+      toast.info(`Received ${totalVariants} products/variants from Shopify. Syncing to database...`);
       
       if (shopifyProducts.length === 0) {
         toast.info('No products found on Shopify.');
@@ -175,30 +177,39 @@ export default function ProductsPage() {
       
       let added = 0;
       let updated = 0;
+      const processedSkus = new Set();
       
       // Process products in parallel batches for speed
       const batchSize = 10;
       for (let i = 0; i < shopifyProducts.length; i += batchSize) {
         const chunk = shopifyProducts.slice(i, i + batchSize);
-        await Promise.all(chunk.map(async (sp: any) => {
+        const results = await Promise.all(chunk.map(async (sp: any) => {
+          if (processedSkus.has(sp.sku)) return null;
+          processedSkus.add(sp.sku);
+
           const existingProduct = products.find(p => p.sku === sp.sku);
           if (existingProduct) {
             await updateProduct(existingProduct.id, {
               name: sp.name,
               imageUrl: sp.imageUrl || existingProduct.imageUrl,
             });
-            updated++;
+            return 'updated';
           } else {
             await addProduct({
               ...sp,
               quantity: 0
             });
-            added++;
+            return 'added';
           }
         }));
+
+        results.forEach(res => {
+          if (res === 'updated') updated++;
+          if (res === 'added') added++;
+        });
       }
       
-      toast.success(`Shopify sync complete! Added ${added}, Updated ${updated}.`);
+      toast.success(`Sync complete! Total items: ${totalVariants} (New: ${added}, Updated: ${updated})`);
     } catch (error: any) {
       toast.error(`Sync failed: ${error.message}`);
     } finally {
