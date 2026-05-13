@@ -59,8 +59,17 @@ export default async function handler(req: any, res: any) {
       const parts = linkHeader.split(',');
       for (const part of parts) {
         if (part.includes('rel="next"')) {
-          const match = part.match(/page_info=([^&>]+)/);
-          if (match) nextPageInfo = match[1];
+          const urlMatch = part.match(/<([^>]+)>/);
+          if (urlMatch) {
+            try {
+              const nextUrl = new URL(urlMatch[1]);
+              nextPageInfo = nextUrl.searchParams.get('page_info');
+            } catch (e) {
+              // Fallback to regex if URL parsing fails
+              const match = urlMatch[1].match(/page_info=([^&>]+)/);
+              if (match) nextPageInfo = match[1];
+            }
+          }
         }
       }
     }

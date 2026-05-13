@@ -153,9 +153,11 @@ export default function ProductsPage() {
     setIsSyncingShopify(true);
     let added = 0;
     let updated = 0;
-    let nextPageInfo = null;
     let totalSynced = 0;
-    const processedSkus = new Set();
+    let nextPageInfo = null;
+    const existingSkus = new Set(products.map(p => p.sku));
+    const skuToId = new Map(products.map(p => [p.sku, p.id]));
+    const processedInSession = new Set();
 
     try {
       do {
@@ -185,22 +187,27 @@ export default function ProductsPage() {
           for (let i = 0; i < shopifyProducts.length; i += batchSize) {
             const chunk = shopifyProducts.slice(i, i + batchSize);
             const results = await Promise.all(chunk.map(async (sp: any) => {
-              if (processedSkus.has(sp.sku)) return null;
-              processedSkus.add(sp.sku);
+              if (processedInSession.has(sp.sku)) return null;
+              processedInSession.add(sp.sku);
 
-              // Check existing products (from initial state)
-              const existingProduct = products.find(p => p.sku === sp.sku);
-              if (existingProduct) {
-                await updateProduct(existingProduct.id, {
-                  name: sp.name,
-                  imageUrl: sp.imageUrl || existingProduct.imageUrl,
-                });
-                return 'updated';
+              const isExisting = existingSkus.has(sp.sku);
+              if (isExisting) {
+                const id = skuToId.get(sp.sku);
+                if (id) {
+                  await updateProduct(id, {
+                    name: sp.name,
+                    imageUrl: sp.imageUrl,
+                  });
+                  return 'updated';
+                }
+                return null;
               } else {
                 await addProduct({
                   ...sp,
                   quantity: 0
                 });
+                // Update local sets to avoid re-adding in next pages
+                existingSkus.add(sp.sku); 
                 return 'added';
               }
             }));
@@ -213,7 +220,7 @@ export default function ProductsPage() {
         }
       } while (nextPageInfo);
       
-      toast.success(`Full sync complete! Total items processed: ${totalSynced} (New: ${added}, Updated: ${updated})`);
+      toast.success(`Full sync complete! Total items: ${totalSynced} (New: ${added}, Updated: ${updated})`);
     } catch (error: any) {
       toast.error(`Sync failed: ${error.message}`);
     } finally {

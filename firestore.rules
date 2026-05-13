@@ -23,8 +23,8 @@ service cloud.firestore {
     // Products
     match /products/{productId} {
       function isValidProduct(data) {
-        return data.name is string && data.name.size() > 0 && data.name.size() <= 200
-          && data.sku is string && data.sku.size() > 0 && data.sku.size() <= 100
+        return data.name is string && data.name.size() > 0 && data.name.size() <= 500
+          && data.sku is string && data.sku.size() > 0
           && data.price is number && data.price >= 0
           && data.quantity is number && data.quantity >= 0
           && data.userId == request.auth.uid;
