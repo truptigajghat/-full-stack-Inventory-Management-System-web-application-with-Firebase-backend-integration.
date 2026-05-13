@@ -11,6 +11,19 @@ export interface Product {
   userId: string;
   createdAt: any;
   updatedAt: any;
+  // Multi-store tracking
+  storeName?: string;
+  storeDomain?: string;
+  variantId?: string;
+  source?: string;
+}
+
+export interface ShopifyStoreConfig {
+  id: string;
+  name: string;
+  domain: string;
+  token: string;
+  color?: string;
 }
 
 export interface Category {

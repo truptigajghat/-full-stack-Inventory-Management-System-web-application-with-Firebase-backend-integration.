@@ -23,7 +23,7 @@ export function useInventory() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [shopifySettings, setShopifySettings] = useState<{ domain: string; token: string } | null>(null);
+  const [shopifySettings, setShopifySettings] = useState<ShopifyStoreConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +32,7 @@ export function useInventory() {
       setProducts([]);
       setCategories([]);
       setTransactions([]);
-      setShopifySettings(null);
+      setShopifySettings([]);
       setLoading(false);
       return;
     }
@@ -85,9 +85,22 @@ export function useInventory() {
     const unsubShopifySettings = onSnapshot(doc(db, 'user_settings', user.uid), (doc) => {
       if (doc.exists()) {
         const data = doc.data();
-        setShopifySettings({ domain: data.shopifyDomain, token: data.shopifyAccessToken });
+        // Fallback for legacy single-store settings if they exist
+        if (data.shopifyDomain && !data.stores) {
+          setShopifySettings([{
+            id: '1',
+            name: 'Primary Store',
+            domain: data.shopifyDomain,
+            token: data.shopifyAccessToken,
+            color: 'blue'
+          }]);
+        } else if (data.stores) {
+          setShopifySettings(data.stores);
+        } else {
+          setShopifySettings([]);
+        }
       } else {
-        setShopifySettings(null);
+        setShopifySettings([]);
       }
     });
 
@@ -223,12 +236,11 @@ export function useInventory() {
     addCategory,
     deleteCategory,
     uploadImage,
-    saveShopifySettings: async (domain: string, token: string) => {
+    saveShopifySettings: async (stores: ShopifyStoreConfig[]) => {
       if (!user) return;
       try {
         await setDoc(doc(db, 'user_settings', user.uid), {
-          shopifyDomain: domain,
-          shopifyAccessToken: token,
+          stores,
           updatedAt: serverTimestamp(),
         });
       } catch (error) {

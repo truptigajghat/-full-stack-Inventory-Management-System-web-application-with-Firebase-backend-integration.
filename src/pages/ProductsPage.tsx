@@ -47,6 +47,7 @@ export default function ProductsPage() {
     error 
   } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadingLocal, setLoadingLocal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -63,8 +64,13 @@ export default function ProductsPage() {
   const filteredProducts = products.filter(p => 
     (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    (p.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.storeName || '').toLowerCase().includes(searchTerm.toLowerCase())
+  ).sort((a, b) => {
+    if (sortOrder === 'asc') return a.quantity - b.quantity;
+    if (sortOrder === 'desc') return b.quantity - a.quantity;
+    return 0;
+  });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -144,104 +150,103 @@ export default function ProductsPage() {
   };
 
   const handleShopifySync = async () => {
-    if (!shopifySettings?.domain || !shopifySettings?.token) {
-      toast.error('Please configure your Shopify settings first.');
+    if (!shopifySettings || shopifySettings.length === 0) {
+      toast.error('Please configure at least one Shopify store first.');
       setIsSettingsModalOpen(true);
       return;
     }
 
     setIsSyncingShopify(true);
-    let added = 0;
-    let updated = 0;
-    let totalSynced = 0;
-    let nextPageInfo = null;
+    let totalAdded = 0;
+    let totalUpdated = 0;
     const syncedIds = new Set();
-    const processedNames = new Set();
 
     try {
-      do {
-        const url = `/api/sync-shopify${nextPageInfo ? `?page_info=${encodeURIComponent(nextPageInfo)}` : ''}`;
-        const response = await fetch(url, {
-          headers: {
-            'x-shopify-domain': shopifySettings.domain,
-            'x-shopify-token': shopifySettings.token
+      // Sync each store one by one
+      for (const store of shopifySettings) {
+        if (!store.domain || !store.token) continue;
+        
+        toast.info(`Syncing from ${store.name || store.domain}...`);
+        let nextPageInfo = null;
+        let storeSyncedCount = 0;
+
+        do {
+          const url = `/api/sync-shopify?${nextPageInfo ? `page_info=${encodeURIComponent(nextPageInfo)}` : ''}`;
+          const response = await fetch(url, {
+            headers: {
+              'x-shopify-domain': store.domain,
+              'x-shopify-token': store.token,
+              'x-shopify-store-name': store.name || 'Store'
+            }
+          });
+
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(`[${store.name}] ${errData.error || 'Sync failed'}`);
           }
-        });
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || 'Failed to fetch from Shopify');
-        }
+          const data = await response.json();
+          const shopifyProducts = data.products || [];
+          nextPageInfo = data.nextPageInfo;
+          storeSyncedCount += shopifyProducts.length;
 
-        const data = await response.json();
-        const shopifyProducts = data.products || [];
-        nextPageInfo = data.nextPageInfo;
-        totalSynced += shopifyProducts.length;
-
-        if (shopifyProducts.length > 0) {
-          toast.info(`Consolidating unique products... (${totalSynced} items)`);
-          
-          const batchSize = 5;
-          for (let i = 0; i < shopifyProducts.length; i += batchSize) {
-            const chunk = shopifyProducts.slice(i, i + batchSize);
-            await Promise.all(chunk.map(async (sp: any) => {
-              if (processedNames.has(sp.name)) return;
-              processedNames.add(sp.name);
-
-              // AGGRESSIVE MATCHING: Find ANY product that starts with this name
-              // This catches "Saree - Red", "Saree - Blue", etc. and merges them.
-              const matches = products.filter(p => 
-                p.name === sp.name || 
-                p.name.startsWith(sp.name) || 
-                sp.name.startsWith(p.name)
-              );
-              
-              if (matches.length > 0) {
-                // Keep the first match, update it to the parent info
-                const primary = matches[0];
-                await updateProduct(primary.id, {
-                  ...sp,
-                  quantity: primary.quantity, // Keep their stock
-                  source: 'shopify'
-                });
-                syncedIds.add(primary.id);
+          if (shopifyProducts.length > 0) {
+            // Process products in batches
+            const batchSize = 10;
+            for (let i = 0; i < shopifyProducts.length; i += batchSize) {
+              const chunk = shopifyProducts.slice(i, i + batchSize);
+              await Promise.all(chunk.map(async (sp: any) => {
+                // Find existing by storeDomain + variantId OR SKU
+                const existingProduct = products.find(p => 
+                  (p.storeDomain === sp.storeDomain && p.variantId === sp.variantId) || 
+                  p.sku === sp.sku
+                );
                 
-                // DELETE ALL OTHER MATCHES (these are the duplicates/variants)
-                const others = matches.slice(1);
-                for (const extra of others) {
-                  await deleteProduct(extra.id);
+                if (existingProduct) {
+                  await updateProduct(existingProduct.id, {
+                    name: sp.name,
+                    sku: sp.sku,
+                    imageUrl: sp.imageUrl || existingProduct.imageUrl,
+                    storeName: sp.storeName,
+                    storeDomain: sp.storeDomain,
+                    variantId: sp.variantId,
+                    source: 'shopify'
+                  });
+                  syncedIds.add(existingProduct.id);
+                  totalUpdated++;
+                } else {
+                  const newId = await addProduct({
+                    ...sp,
+                    quantity: 0
+                  });
+                  if (newId) syncedIds.add(newId);
+                  totalAdded++;
                 }
-              } else {
-                // Brand new product
-                const newId = await addProduct({
-                  ...sp,
-                  quantity: 0
-                });
-                if (newId) syncedIds.add(newId);
-              }
-            }));
+              }));
+            }
           }
-        }
-      } while (nextPageInfo);
-      
-      // EXHAUSTIVE CLEANUP: Delete any Shopify products that were not part of this sync session
-      // This removes filtered items like "Partial Payment" or products deleted from Shopify.
+        } while (nextPageInfo);
+        
+        toast.success(`Finished syncing ${storeSyncedCount} items from ${store.name}`);
+      }
+
+      // EXHAUSTIVE CLEANUP: Delete any Shopify products that were not in THIS sync session
       const productsToDelete = products.filter(p => 
         (p.source === 'shopify' || (p.sku && p.sku.startsWith('SHOPIFY-'))) && 
         !syncedIds.has(p.id)
       );
       
       if (productsToDelete.length > 0) {
-        toast.info(`Finalizing cleanup of ${productsToDelete.length} items...`);
+        toast.info(`Cleaning up ${productsToDelete.length} removed variants...`);
         for (let i = 0; i < productsToDelete.length; i += 5) {
           const chunk = productsToDelete.slice(i, i + 5);
           await Promise.all(chunk.map(p => deleteProduct(p.id)));
         }
       }
-      
-      toast.success(`Full sync complete! Total unique products: ${syncedIds.size}`);
+
+      toast.success(`Full sync complete! Total: ${totalAdded} new, ${totalUpdated} updated.`);
     } catch (error: any) {
-      toast.error(`Sync failed: ${error.message}`);
+      toast.error(`Sync aborted: ${error.message}`);
     } finally {
       setIsSyncingShopify(false);
     }
@@ -420,15 +425,27 @@ export default function ProductsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search by name, SKU, or category..." 
+            placeholder="Search by name, SKU, category, or store..." 
             className="pl-9 bg-background border-none shadow-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" size="icon" className="rounded-xl">
-          <Filter className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={sortOrder} onValueChange={(val: any) => setSortOrder(val)}>
+            <SelectTrigger className="w-[180px] bg-background border-none shadow-none rounded-xl">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span>Stock Sort</span>
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="asc">Stock: Low to High</SelectItem>
+              <SelectItem value="desc">Stock: High to Low</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
@@ -452,7 +469,7 @@ export default function ProductsPage() {
                   </div>
                 )}
                 
-                <div className="absolute top-4 right-4">
+                <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
                   <div className={cn(
                     "px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase backdrop-blur-md shadow-sm border border-white/20",
                     isOutOfStock ? "bg-rose-500/80 text-white" : 
@@ -461,6 +478,17 @@ export default function ProductsPage() {
                   )}>
                     {isOutOfStock ? "Sold Out" : isLowStock ? "Low Stock" : "In Stock"}
                   </div>
+                  {p.storeName && (
+                    <div className={cn(
+                      "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter backdrop-blur-md shadow-sm border border-white/10 text-white",
+                      p.storeName.includes('1') ? "bg-blue-600/70" :
+                      p.storeName.includes('2') ? "bg-purple-600/70" :
+                      p.storeName.includes('3') ? "bg-orange-600/70" :
+                      "bg-indigo-600/70"
+                    )}>
+                      {p.storeName}
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -528,29 +556,48 @@ export default function ProductsPage() {
 
       {/* Shopify Settings Modal */}
       <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Shopify Integration Settings</DialogTitle>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <Box className="h-6 w-6 text-primary" />
+              </div>
+              Shopify Multi-Store Settings
+            </DialogTitle>
             <DialogDescription>
-              Enter your Shopify store details to enable product syncing.
+              Connect up to 4 Shopify stores. All products will be synced into your unified dashboard.
             </DialogDescription>
           </DialogHeader>
           <form 
             onSubmit={async (e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
-              const domain = formData.get('domain') as string;
-              const token = formData.get('token') as string;
+              const stores: ShopifyStoreConfig[] = [];
               
-              if (!domain || !token) {
-                toast.error('Both fields are required');
+              for (let i = 1; i <= 4; i++) {
+                const name = formData.get(`name_${i}`) as string;
+                const domain = formData.get(`domain_${i}`) as string;
+                const token = formData.get(`token_${i}`) as string;
+                
+                if (domain && token) {
+                  stores.push({
+                    id: i.toString(),
+                    name: name || `Store ${i}`,
+                    domain,
+                    token
+                  });
+                }
+              }
+              
+              if (stores.length === 0) {
+                toast.error('At least one store must be configured');
                 return;
               }
               
               setLoadingLocal(true);
               try {
-                await saveShopifySettings(domain, token);
-                toast.success('Shopify settings saved');
+                await saveShopifySettings(stores);
+                toast.success(`${stores.length} store(s) connected successfully`);
                 setIsSettingsModalOpen(false);
               } catch (err: any) {
                 toast.error(err.message);
@@ -558,33 +605,53 @@ export default function ProductsPage() {
                 setLoadingLocal(false);
               }
             }} 
-            className="space-y-4 py-4"
+            className="space-y-6 py-6"
           >
-            <div className="space-y-2">
-              <Label htmlFor="domain">Shopify Store Domain</Label>
-              <Input 
-                id="domain" 
-                name="domain" 
-                placeholder="your-store.myshopify.com" 
-                defaultValue={shopifySettings?.domain}
-                required 
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[1, 2, 3, 4].map((i) => {
+                const store = shopifySettings.find(s => s.id === i.toString());
+                return (
+                  <div key={i} className="p-4 rounded-2xl bg-muted/30 border border-muted-foreground/10 space-y-4">
+                    <h4 className="font-bold text-sm uppercase tracking-widest text-muted-foreground mb-2 flex items-center justify-between">
+                      Store {i}
+                      {store && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                    </h4>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">Store Name</Label>
+                      <Input 
+                        name={`name_${i}`} 
+                        placeholder={`Saree Palace ${i}`} 
+                        defaultValue={store?.name}
+                        className="bg-background/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">Domain</Label>
+                      <Input 
+                        name={`domain_${i}`} 
+                        placeholder="store.myshopify.com" 
+                        defaultValue={store?.domain}
+                        className="bg-background/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">Access Token</Label>
+                      <Input 
+                        name={`token_${i}`} 
+                        type="password"
+                        placeholder="shpat_..." 
+                        defaultValue={store?.token}
+                        className="bg-background/50"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="token">Admin API Access Token</Label>
-              <Input 
-                id="token" 
-                name="token" 
-                type="password"
-                placeholder="shpat_..." 
-                defaultValue={shopifySettings?.token}
-                required 
-              />
-            </div>
-            <DialogFooter className="mt-6">
+            <DialogFooter className="mt-8 border-t pt-6">
               <Button type="button" variant="ghost" onClick={() => setIsSettingsModalOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={loadingLocal}>
-                {loadingLocal ? 'Saving...' : 'Save Settings'}
+              <Button type="submit" disabled={loadingLocal} className="rounded-xl px-8">
+                {loadingLocal ? 'Connecting...' : 'Save All Stores'}
               </Button>
             </DialogFooter>
           </form>
