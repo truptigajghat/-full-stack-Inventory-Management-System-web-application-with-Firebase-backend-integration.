@@ -47,20 +47,20 @@ export default async function handler(req: any, res: any) {
       const data = await response.json();
       if (data.products && Array.isArray(data.products)) {
         allProducts = [...allProducts, ...data.products];
+        console.log(`Successfully fetched page. Subtotal: ${allProducts.length} products.`);
       }
       
-      console.log(`Fetched page. Current total: ${allProducts.length}`);
-
-      // Shopify Link header parsing
+      // Robust Link header parsing
       const linkHeader = response.headers.get('Link') || response.headers.get('link');
       let nextUrl = null;
       
       if (linkHeader) {
-        // Example: <https://...>; rel="next", <https://...>; rel="previous"
-        const parts = linkHeader.split(',');
-        for (const part of parts) {
-          if (part.includes('rel="next"')) {
-            const match = part.match(/<([^>]+)>/);
+        // Shopify Link header: <url>; rel="next", <url>; rel="previous"
+        const links = linkHeader.split(',');
+        for (const link of links) {
+          const [urlPart, relPart] = link.split(';');
+          if (relPart && relPart.includes('next')) {
+            const match = urlPart.match(/<([^>]+)>/);
             if (match) {
               nextUrl = match[1];
               break;
@@ -70,6 +70,12 @@ export default async function handler(req: any, res: any) {
       }
       
       url = nextUrl;
+      
+      // Add a small delay to avoid Shopify rate limits (2 req/sec)
+      if (url) {
+        console.log(`Next page found. Waiting 500ms...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
     
     // Transform Shopify products to match our app's Product format
