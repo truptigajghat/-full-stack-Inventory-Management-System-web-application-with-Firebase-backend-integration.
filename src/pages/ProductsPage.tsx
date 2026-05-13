@@ -14,15 +14,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '../components/ui/table';
 import { Card } from '../components/ui/card';
+
 import { 
   Dialog, 
   DialogContent, 
@@ -185,17 +178,19 @@ export default function ProductsPage() {
       for (const sp of shopifyProducts) {
         const existingProduct = products.find(p => p.sku === sp.sku);
         if (existingProduct) {
+          // ONLY update name and image as requested
           await updateProduct(existingProduct.id, {
             name: sp.name,
-            description: sp.description,
-            price: sp.price,
-            quantity: sp.quantity,
-            category: sp.category,
             imageUrl: sp.imageUrl || existingProduct.imageUrl,
           });
           updated++;
         } else {
-          await addProduct(sp);
+          // For new products, sync everything but initialize quantity to 0
+          // to prevent accidental stock inflation
+          await addProduct({
+            ...sp,
+            quantity: 0
+          });
           added++;
         }
       }
@@ -392,85 +387,100 @@ export default function ProductsPage() {
         </Button>
       </div>
 
-      <Card className="border-none shadow-sm overflow-hidden rounded-2xl">
-        <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead className="text-right w-[150px]">Stock</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredProducts.map((p) => {
-              const currentStock = stockChanges[p.id] !== undefined ? stockChanges[p.id] : p.quantity;
-              const isLowStock = currentStock > 0 && currentStock <= p.minQuantity;
-              const isOutOfStock = currentStock === 0;
-              
-              return (
-                <TableRow key={p.id} className="group">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10">
-                        {p.imageUrl ? (
-                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                            <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
-                          </div>
-                        ) : (
-                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium">{p.name}</p>
-                        <p className="text-xs text-muted-foreground uppercase">{p.sku}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end">
-                      <Input 
-                        type="number" 
-                        value={currentStock}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value);
-                          if (!isNaN(val)) {
-                            setStockChanges(prev => ({ ...prev, [p.id]: val }));
-                          }
-                        }}
-                        className={cn(
-                          "w-24 text-right font-semibold",
-                          isOutOfStock ? "text-rose-500 border-rose-200" : 
-                          isLowStock ? "text-amber-500 border-amber-200" : ""
-                        )}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-            {!loading && filteredProducts.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="p-3 bg-muted rounded-full">
-                      <Box className="h-6 w-6" />
-                    </div>
-                    <p>No products found</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
+        {filteredProducts.map((p) => {
+          const currentStock = stockChanges[p.id] !== undefined ? stockChanges[p.id] : p.quantity;
+          const isLowStock = currentStock > 0 && currentStock <= p.minQuantity;
+          const isOutOfStock = currentStock === 0;
+
+          return (
+            <Card key={p.id} className="group border-none shadow-none bg-transparent overflow-hidden flex flex-col">
+              <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted mb-4 shadow-sm group-hover:shadow-2xl transition-all duration-500 border border-muted/50">
+                {p.imageUrl ? (
+                  <img 
+                    src={p.imageUrl} 
+                    alt={p.name} 
+                    className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <ImageIcon className="h-12 w-12 text-muted-foreground/20" />
                   </div>
-                </TableCell>
-              </TableRow>
-            )}
-            {loading && (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={6}><div className="h-12 bg-muted animate-pulse rounded-lg w-full" /></TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+                )}
+                
+                <div className="absolute top-4 right-4">
+                  <div className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase backdrop-blur-md shadow-sm border border-white/20",
+                    isOutOfStock ? "bg-rose-500/80 text-white" : 
+                    isLowStock ? "bg-amber-500/80 text-white" : 
+                    "bg-emerald-500/80 text-white"
+                  )}>
+                    {isOutOfStock ? "Sold Out" : isLowStock ? "Low Stock" : "In Stock"}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4 px-1">
+                <div>
+                  <h3 className="font-semibold text-lg line-clamp-1 leading-tight group-hover:text-primary transition-colors">
+                    {p.name}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium mt-1.5">
+                    {p.sku}
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-between gap-4 pt-3 border-t border-muted/50">
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Stock Units
+                  </span>
+                  <div className="relative w-24">
+                    <Input 
+                      type="number" 
+                      value={currentStock}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) {
+                          setStockChanges(prev => ({ ...prev, [p.id]: val }));
+                        }
+                      }}
+                      className={cn(
+                        "h-10 text-right font-bold bg-muted/40 border-none shadow-none rounded-xl focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
+                        isOutOfStock ? "text-rose-500" : 
+                        isLowStock ? "text-amber-500" : "text-foreground"
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+
+        {!loading && filteredProducts.length === 0 && (
+          <div className="col-span-full py-20 text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="p-4 bg-muted rounded-full">
+                <Box className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xl font-semibold">No products found</p>
+                <p className="text-muted-foreground">Try adjusting your search or sync from Shopify.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="space-y-4">
+              <div className="aspect-[3/4] bg-muted animate-pulse rounded-2xl" />
+              <div className="h-6 bg-muted animate-pulse rounded-lg w-3/4" />
+              <div className="h-10 bg-muted animate-pulse rounded-xl w-full" />
+            </div>
+          ))
+        )}
+      </div>
 
       {/* Shopify Settings Modal */}
       <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
