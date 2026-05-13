@@ -102,12 +102,13 @@ export function useInventory() {
   const addProduct = async (product: Omit<Product, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
     if (!user) return;
     try {
-      await addDoc(collection(db, 'products'), {
+      const docRef = await addDoc(collection(db, 'products'), {
         ...product,
         userId: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'products');
     }

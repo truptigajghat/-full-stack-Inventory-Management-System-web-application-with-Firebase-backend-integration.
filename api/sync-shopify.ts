@@ -92,6 +92,7 @@ export default async function handler(req: any, res: any) {
         minQuantity: 5,
         category: p.product_type || 'Uncategorized',
         imageUrl: variantImage,
+        source: 'shopify', // Mark as shopify-sourced for easier cleanup
       });
     }
 

@@ -155,9 +155,10 @@ export default function ProductsPage() {
     let updated = 0;
     let totalSynced = 0;
     let nextPageInfo = null;
-    const existingSkus = new Set(products.map(p => p.sku));
+    const syncedIds = new Set();
+    const processedNames = new Set();
     const skuToId = new Map(products.map(p => [p.sku, p.id]));
-    const processedInSession = new Set();
+    const nameToId = new Map(products.map(p => [p.name, p.id]));
 
     try {
       do {
@@ -180,34 +181,33 @@ export default function ProductsPage() {
         totalSynced += shopifyProducts.length;
 
         if (shopifyProducts.length > 0) {
-          toast.info(`Fetching batch... (${totalSynced} items found so far)`);
+          toast.info(`Syncing items... (${totalSynced} unique items found)`);
           
-          // Process products in parallel batches for speed
-          const batchSize = 10;
+          const batchSize = 5;
           for (let i = 0; i < shopifyProducts.length; i += batchSize) {
             const chunk = shopifyProducts.slice(i, i + batchSize);
             const results = await Promise.all(chunk.map(async (sp: any) => {
-              if (processedInSession.has(sp.sku)) return null;
-              processedInSession.add(sp.sku);
+              if (processedNames.has(sp.name)) return null;
+              processedNames.add(sp.name);
 
-              const isExisting = existingSkus.has(sp.sku);
-              if (isExisting) {
-                const id = skuToId.get(sp.sku);
-                if (id) {
-                  await updateProduct(id, {
-                    name: sp.name,
-                    imageUrl: sp.imageUrl,
-                  });
-                  return 'updated';
-                }
-                return null;
+              // Match by SKU or exact Name to consolidate variants
+              const existingId = skuToId.get(sp.sku) || nameToId.get(sp.name);
+              
+              if (existingId) {
+                await updateProduct(existingId, {
+                  name: sp.name,
+                  sku: sp.sku,
+                  imageUrl: sp.imageUrl,
+                  source: 'shopify'
+                });
+                syncedIds.add(existingId);
+                return 'updated';
               } else {
-                await addProduct({
+                const newId = await addProduct({
                   ...sp,
                   quantity: 0
                 });
-                // Update local sets to avoid re-adding in next pages
-                existingSkus.add(sp.sku); 
+                if (newId) syncedIds.add(newId);
                 return 'added';
               }
             }));
@@ -220,7 +220,22 @@ export default function ProductsPage() {
         }
       } while (nextPageInfo);
       
-      toast.success(`Full sync complete! Total items: ${totalSynced} (New: ${added}, Updated: ${updated})`);
+      // CLEANUP: Delete any Shopify products that were not in the latest sync
+      const productsToDelete = products.filter(p => 
+        (p.source === 'shopify' || (p.sku && p.sku.startsWith('SHOPIFY-'))) && 
+        !syncedIds.has(p.id)
+      );
+      
+      if (productsToDelete.length > 0) {
+        toast.info(`Cleaning up ${productsToDelete.length} duplicate variants...`);
+        // Use small batches for deletion to avoid Firestore contention
+        for (let i = 0; i < productsToDelete.length; i += 5) {
+          const chunk = productsToDelete.slice(i, i + 5);
+          await Promise.all(chunk.map(p => deleteProduct(p.id)));
+        }
+      }
+      
+      toast.success(`Full sync complete! Total unique items: ${syncedIds.size}`);
     } catch (error: any) {
       toast.error(`Sync failed: ${error.message}`);
     } finally {
