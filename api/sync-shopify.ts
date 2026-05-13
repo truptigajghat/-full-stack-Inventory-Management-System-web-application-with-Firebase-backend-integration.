@@ -46,6 +46,7 @@ export default async function handler(req: any, res: any) {
 
       const data = await response.json();
       allProducts = [...allProducts, ...data.products];
+      console.log(`Fetched ${data.products.length} products. Total so far: ${allProducts.length}`);
 
       // Check for next page using Link header
       const linkHeader = response.headers.get('link');

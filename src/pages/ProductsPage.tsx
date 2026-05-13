@@ -175,24 +175,26 @@ export default function ProductsPage() {
       let added = 0;
       let updated = 0;
       
-      for (const sp of shopifyProducts) {
-        const existingProduct = products.find(p => p.sku === sp.sku);
-        if (existingProduct) {
-          // ONLY update name and image as requested
-          await updateProduct(existingProduct.id, {
-            name: sp.name,
-            imageUrl: sp.imageUrl || existingProduct.imageUrl,
-          });
-          updated++;
-        } else {
-          // For new products, sync everything but initialize quantity to 0
-          // to prevent accidental stock inflation
-          await addProduct({
-            ...sp,
-            quantity: 0
-          });
-          added++;
-        }
+      // Process products in parallel batches for speed
+      const batchSize = 10;
+      for (let i = 0; i < shopifyProducts.length; i += batchSize) {
+        const chunk = shopifyProducts.slice(i, i + batchSize);
+        await Promise.all(chunk.map(async (sp: any) => {
+          const existingProduct = products.find(p => p.sku === sp.sku);
+          if (existingProduct) {
+            await updateProduct(existingProduct.id, {
+              name: sp.name,
+              imageUrl: sp.imageUrl || existingProduct.imageUrl,
+            });
+            updated++;
+          } else {
+            await addProduct({
+              ...sp,
+              quantity: 0
+            });
+            added++;
+          }
+        }));
       }
       
       toast.success(`Shopify sync complete! Added ${added}, Updated ${updated}.`);
