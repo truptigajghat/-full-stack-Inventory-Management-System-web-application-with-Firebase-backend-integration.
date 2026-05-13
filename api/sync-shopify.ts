@@ -27,27 +27,38 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Make request to Shopify Admin REST API
-    const response = await fetch(
-      `https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/products.json`,
-      {
+    let allProducts: any[] = [];
+    let url: string | null = `https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/products.json?limit=250&status=active`;
+
+    while (url) {
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN as string,
         },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Shopify API responded with ${response.status}: ${errorText}`);
       }
-    );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Shopify API responded with ${response.status}: ${errorText}`);
+      const data = await response.json();
+      allProducts = [...allProducts, ...data.products];
+
+      // Check for next page using Link header
+      const linkHeader = response.headers.get('link');
+      if (linkHeader && linkHeader.includes('rel="next"')) {
+        const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        url = match ? match[1] : null;
+      } else {
+        url = null;
+      }
     }
-
-    const data = await response.json();
     
     // Transform Shopify products to match our app's Product format
-    const transformedProducts = data.products.map((p: any) => {
+    const transformedProducts = allProducts.map((p: any) => {
       // Get the first variant for price and quantity
       const firstVariant = p.variants?.[0] || {};
       

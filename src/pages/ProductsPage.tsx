@@ -6,23 +6,11 @@ import {
   Download, 
   Search, 
   Filter,
-  LayoutGrid, 
-  List as ListIcon, 
-  MoreHorizontal, 
-  MoreVertical,
-  Trash2, 
-  Edit, 
-  Edit2,
-  History, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  ArrowLeftRight,
   AlertTriangle,
   Image as ImageIcon,
-  Eye,
-  ExternalLink,
   RefreshCw,
-  Settings
+  Settings,
+  Save
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -34,14 +22,7 @@ import {
   TableHeader, 
   TableRow 
 } from '../components/ui/table';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '../components/ui/dropdown-menu';
-import { Badge } from '../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card } from '../components/ui/card';
 import { 
   Dialog, 
   DialogContent, 
@@ -52,13 +33,10 @@ import {
   DialogDescription,
 } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { toast } from 'sonner';
 import { Product } from '../types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { StockActionModal } from '../components/inventory/StockActionModal';
 import { cn } from '../lib/utils';
 
 export default function ProductsPage() {
@@ -85,6 +63,8 @@ export default function ProductsPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSyncingShopify, setIsSyncingShopify] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [stockChanges, setStockChanges] = useState<Record<string, number>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -148,6 +128,25 @@ export default function ProductsPage() {
       startY: 20,
     });
     doc.save('inventory-report.pdf');
+  };
+
+  const handleSaveAllChanges = async () => {
+    const changeIds = Object.keys(stockChanges);
+    if (changeIds.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      for (const id of changeIds) {
+        const newQuantity = stockChanges[id];
+        await updateProduct(id, { quantity: newQuantity });
+      }
+      setStockChanges({});
+      toast.success('Stock updated successfully');
+    } catch (error: any) {
+      toast.error('Failed to save changes: ' + error.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleShopifySync = async () => {
@@ -239,6 +238,15 @@ export default function ProductsPage() {
           >
             <RefreshCw className={cn("mr-2 h-4 w-4", isSyncingShopify && "animate-spin")} />
             {isSyncingShopify ? 'Syncing...' : 'Shopify Sync'}
+          </Button>
+
+          <Button 
+            onClick={handleSaveAllChanges} 
+            disabled={isSaving || Object.keys(stockChanges).length === 0}
+            className="rounded-full shadow-lg shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {isSaving ? 'Saving...' : 'SAVE'}
           </Button>
 
           <Button
@@ -388,17 +396,14 @@ export default function ProductsPage() {
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead>Product</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead className="text-right">Stock</TableHead>
-              <TableHead className="text-right">Price</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="text-right w-[150px]">Stock</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredProducts.map((p) => {
-              const isLowStock = p.quantity > 0 && p.quantity <= p.minQuantity;
-              const isOutOfStock = p.quantity === 0;
+              const currentStock = stockChanges[p.id] !== undefined ? stockChanges[p.id] : p.quantity;
+              const isLowStock = currentStock > 0 && currentStock <= p.minQuantity;
+              const isOutOfStock = currentStock === 0;
               
               return (
                 <TableRow key={p.id} className="group">
@@ -406,84 +411,38 @@ export default function ProductsPage() {
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10">
                         {p.imageUrl ? (
-                          <Popover open={hoveredProductId === p.id} onOpenChange={(open) => !open && setHoveredProductId(null)}>
-                            <PopoverTrigger asChild>
-                              <div 
-                                className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center cursor-pointer group/img"
-                                onMouseEnter={() => setHoveredProductId(p.id)}
-                                onMouseLeave={() => setHoveredProductId(null)}
-                              >
-                                <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover rounded-lg" />
-                              </div>
-                            </PopoverTrigger>
-                            <PopoverContent side="right" align="start" className="p-1 w-80 border-none shadow-2xl rounded-2xl overflow-hidden bg-background/95 backdrop-blur-sm">
-                              <img src={p.imageUrl} alt={p.name} className="w-full h-auto max-h-[400px] object-contain rounded-xl" />
-                            </PopoverContent>
-                          </Popover>
+                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                            <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+                          </div>
                         ) : (
                           <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
                             <ImageIcon className="h-5 w-5 text-muted-foreground" />
                           </div>
                         )}
                       </div>
-                      <div className="cursor-pointer" onClick={() => setViewProduct(p)}>
-                        <p className="font-medium group-hover:text-primary transition-colors">{p.name}</p>
+                      <div>
+                        <p className="font-medium">{p.name}</p>
                         <p className="text-xs text-muted-foreground uppercase">{p.sku}</p>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-normal">{p.category}</Badge>
-                  </TableCell>
                   <TableCell className="text-right">
-                    <span className={cn(
-                      "font-semibold",
-                      isOutOfStock ? "text-rose-500" : isLowStock ? "text-amber-500" : ""
-                    )}>
-                      {p.quantity}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">${p.price.toFixed(2)}</TableCell>
-                  <TableCell>
-                    {isOutOfStock ? (
-                      <Badge variant="destructive" className="bg-rose-500/10 text-rose-500 border-none">Out of Stock</Badge>
-                    ) : isLowStock ? (
-                      <Badge className="bg-amber-500/10 text-amber-500 border-none shadow-none">Low Stock</Badge>
-                    ) : (
-                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-none">In Stock</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="w-[100px]">
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => setStockModalProduct(p)}
-                      >
-                        <ArrowLeftRight className="h-4 w-4" />
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setViewProduct(p)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setEditingProduct(p); setIsModalOpen(true); }}>
-                            <Edit2 className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => deleteProduct(p.id)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <div className="flex justify-end">
+                      <Input 
+                        type="number" 
+                        value={currentStock}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val)) {
+                            setStockChanges(prev => ({ ...prev, [p.id]: val }));
+                          }
+                        }}
+                        className={cn(
+                          "w-24 text-right font-semibold",
+                          isOutOfStock ? "text-rose-500 border-rose-200" : 
+                          isLowStock ? "text-amber-500 border-amber-200" : ""
+                        )}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -512,81 +471,7 @@ export default function ProductsPage() {
         </Table>
       </Card>
 
-      <StockActionModal 
-        product={stockModalProduct}
-        isOpen={!!stockModalProduct}
-        onClose={() => setStockModalProduct(null)}
       />
-
-      {/* View Product Modal */}
-      <Dialog open={!!viewProduct} onOpenChange={() => setViewProduct(null)}>
-        <DialogContent className="sm:max-w-[600px] overflow-hidden p-0 rounded-3xl border-none">
-          <DialogHeader className="sr-only">
-            <DialogTitle>{viewProduct?.name || 'Product Details'}</DialogTitle>
-            <DialogDescription>Full details and stock information for this product.</DialogDescription>
-          </DialogHeader>
-          {viewProduct && (
-            <div className="flex flex-col md:flex-row">
-              <div className="w-full md:w-1/2 h-64 md:h-auto bg-muted flex items-center justify-center overflow-hidden">
-                {viewProduct.imageUrl ? (
-                  <img src={viewProduct.imageUrl} alt={viewProduct.name} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <ImageIcon className="h-12 w-12" />
-                    <span className="text-xs">No image available</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 p-8 space-y-6">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline" className="font-normal">{viewProduct.category}</Badge>
-                    <Badge className={cn(
-                      "border-none",
-                      viewProduct.quantity === 0 ? "bg-rose-500/10 text-rose-500" : 
-                      viewProduct.quantity <= viewProduct.minQuantity ? "bg-amber-500/10 text-amber-500" : 
-                      "bg-emerald-500/10 text-emerald-500"
-                    )}>
-                      {viewProduct.quantity === 0 ? "Out of Stock" : 
-                       viewProduct.quantity <= viewProduct.minQuantity ? "Low Stock" : 
-                       "In Stock"}
-                    </Badge>
-                  </div>
-                  <h2 className="text-3xl font-bold tracking-tight">{viewProduct.name}</h2>
-                  <p className="text-sm text-muted-foreground uppercase font-mono mt-1">SKU: {viewProduct.sku}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-6 py-6 border-y border-muted">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Price</p>
-                    <p className="text-2xl font-bold text-primary">${viewProduct.price.toFixed(2)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Current Stock</p>
-                    <p className="text-2xl font-bold">{viewProduct.quantity} units</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase">Description</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {viewProduct.description || "No description provided for this product."}
-                  </p>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button className="flex-1 rounded-full" onClick={() => { setEditingProduct(viewProduct); setIsModalOpen(true); setViewProduct(null); }}>
-                    <Edit className="mr-2 h-4 w-4" /> Edit Product
-                  </Button>
-                  <Button variant="outline" size="icon" className="rounded-full" onClick={() => setViewProduct(null)}>
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Shopify Settings Modal */}
       <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
