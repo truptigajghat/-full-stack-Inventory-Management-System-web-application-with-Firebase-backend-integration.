@@ -21,7 +21,8 @@ import {
   Image as ImageIcon,
   Eye,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -61,7 +62,18 @@ import { StockActionModal } from '../components/inventory/StockActionModal';
 import { cn } from '../lib/utils';
 
 export default function ProductsPage() {
-  const { products, categories, addProduct, updateProduct, deleteProduct, uploadImage, loading, error } = useInventory();
+  const { 
+    products, 
+    categories, 
+    addProduct, 
+    updateProduct, 
+    deleteProduct, 
+    uploadImage, 
+    shopifySettings,
+    saveShopifySettings,
+    loading, 
+    error 
+  } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadingLocal, setLoadingLocal] = useState(false);
@@ -72,6 +84,7 @@ export default function ProductsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSyncingShopify, setIsSyncingShopify] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -138,9 +151,20 @@ export default function ProductsPage() {
   };
 
   const handleShopifySync = async () => {
+    if (!shopifySettings?.domain || !shopifySettings?.token) {
+      toast.error('Please configure your Shopify settings first.');
+      setIsSettingsModalOpen(true);
+      return;
+    }
+
     setIsSyncingShopify(true);
     try {
-      const response = await fetch('/api/sync-shopify');
+      const response = await fetch('/api/sync-shopify', {
+        headers: {
+          'x-shopify-domain': shopifySettings.domain,
+          'x-shopify-token': shopifySettings.token
+        }
+      });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to fetch from Shopify');
@@ -216,6 +240,16 @@ export default function ProductsPage() {
             <RefreshCw className={cn("mr-2 h-4 w-4", isSyncingShopify && "animate-spin")} />
             {isSyncingShopify ? 'Syncing...' : 'Shopify Sync'}
           </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            className="rounded-full"
+            onClick={() => setIsSettingsModalOpen(true)}
+          >
+            <Settings className="h-4 w-4 text-muted-foreground" />
+          </Button>
+
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <DialogTrigger asChild>
               <Button className="rounded-full shadow-lg shadow-primary/20" onClick={() => { 
@@ -551,6 +585,71 @@ export default function ProductsPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Shopify Settings Modal */}
+      <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Shopify Integration Settings</DialogTitle>
+            <DialogDescription>
+              Enter your Shopify store details to enable product syncing.
+            </DialogDescription>
+          </DialogHeader>
+          <form 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const domain = formData.get('domain') as string;
+              const token = formData.get('token') as string;
+              
+              if (!domain || !token) {
+                toast.error('Both fields are required');
+                return;
+              }
+              
+              setLoadingLocal(true);
+              try {
+                await saveShopifySettings(domain, token);
+                toast.success('Shopify settings saved');
+                setIsSettingsModalOpen(false);
+              } catch (err: any) {
+                toast.error(err.message);
+              } finally {
+                setLoadingLocal(false);
+              }
+            }} 
+            className="space-y-4 py-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="domain">Shopify Store Domain</Label>
+              <Input 
+                id="domain" 
+                name="domain" 
+                placeholder="your-store.myshopify.com" 
+                defaultValue={shopifySettings?.domain}
+                required 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="token">Admin API Access Token</Label>
+              <Input 
+                id="token" 
+                name="token" 
+                type="password"
+                placeholder="shpat_..." 
+                defaultValue={shopifySettings?.token}
+                required 
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => setIsSettingsModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={loadingLocal}>
+                {loadingLocal ? 'Saving...' : 'Save Settings'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

@@ -17,12 +17,12 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
-  const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+  const SHOPIFY_STORE_DOMAIN = req.headers['x-shopify-domain'];
+  const SHOPIFY_ACCESS_TOKEN = req.headers['x-shopify-token'];
 
   if (!SHOPIFY_STORE_DOMAIN || !SHOPIFY_ACCESS_TOKEN) {
-    return res.status(500).json({ 
-      error: 'Missing Shopify configuration. Please check environment variables.' 
+    return res.status(400).json({ 
+      error: 'Missing Shopify credentials in request headers (x-shopify-domain, x-shopify-token).' 
     });
   }
 

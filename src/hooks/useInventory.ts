@@ -8,6 +8,7 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
+  setDoc,
   serverTimestamp,
   orderBy,
   limit
@@ -22,6 +23,7 @@ export function useInventory() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [shopifySettings, setShopifySettings] = useState<{ domain: string; token: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +32,7 @@ export function useInventory() {
       setProducts([]);
       setCategories([]);
       setTransactions([]);
+      setShopifySettings(null);
       setLoading(false);
       return;
     }
@@ -79,10 +82,20 @@ export function useInventory() {
       console.error('Transactions query error:', err);
     });
 
+    const unsubShopifySettings = onSnapshot(doc(db, 'user_settings', user.uid), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        setShopifySettings({ domain: data.shopifyDomain, token: data.shopifyAccessToken });
+      } else {
+        setShopifySettings(null);
+      }
+    });
+
     return () => {
       unsubProducts();
       unsubCategories();
       unsubTransactions();
+      unsubShopifySettings();
     };
   }, [user]);
 
@@ -209,6 +222,19 @@ export function useInventory() {
     addCategory,
     deleteCategory,
     uploadImage,
+    saveShopifySettings: async (domain: string, token: string) => {
+      if (!user) return;
+      try {
+        await setDoc(doc(db, 'user_settings', user.uid), {
+          shopifyDomain: domain,
+          shopifyAccessToken: token,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `user_settings/${user.uid}`);
+      }
+    },
+    shopifySettings,
     error
   };
 }

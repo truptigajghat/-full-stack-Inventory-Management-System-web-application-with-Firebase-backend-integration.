@@ -93,5 +93,10 @@ service cloud.firestore {
       // Transactions are usually immutable
       allow update, delete: if false;
     }
+
+    // User Settings (Shopify credentials, etc.)
+    match /user_settings/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
   }
 }
