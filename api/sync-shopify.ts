@@ -46,16 +46,21 @@ export default async function handler(req: any, res: any) {
 
       const data = await response.json();
       allProducts = [...allProducts, ...data.products];
-      console.log(`Fetched ${data.products.length} products. Total so far: ${allProducts.length}`);
+      console.log(`Fetched page: ${data.products.length} products. Total: ${allProducts.length}`);
 
-      // Check for next page using Link header
-      const linkHeader = response.headers.get('link');
-      if (linkHeader && linkHeader.includes('rel="next"')) {
-        const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-        url = match ? match[1] : null;
-      } else {
-        url = null;
+      // Robust parsing for Shopify Link header
+      const linkHeader = response.headers.get('Link') || response.headers.get('link');
+      console.log(`Link Header: ${linkHeader}`);
+      
+      let nextUrl = null;
+      if (linkHeader) {
+        const matches = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        if (matches) {
+          nextUrl = matches[1];
+          console.log(`Found next page URL: ${nextUrl}`);
+        }
       }
+      url = nextUrl;
     }
     
     // Transform Shopify products to match our app's Product format

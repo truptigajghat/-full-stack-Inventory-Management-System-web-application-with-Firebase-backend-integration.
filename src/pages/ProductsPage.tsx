@@ -165,6 +165,7 @@ export default function ProductsPage() {
       
       const data = await response.json();
       const shopifyProducts = data.products || [];
+      toast.info(`Received ${shopifyProducts.length} products from Shopify. Syncing to database...`);
       
       if (shopifyProducts.length === 0) {
         toast.info('No products found on Shopify.');
