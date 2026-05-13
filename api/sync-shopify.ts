@@ -74,24 +74,25 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // Transform variants
+    // Transform Shopify products to match our app's Product format
     const transformedProducts: any[] = [];
+    
     for (const p of products) {
-      const variants = p.variants || [];
-      for (const variant of variants) {
-        const variantImage = p.images?.find((img: any) => img.variant_ids?.includes(variant.id))?.src || p.image?.src || '';
-        
-        transformedProducts.push({
-          name: variant.title === 'Default Title' ? p.title : `${p.title} - ${variant.title}`,
-          sku: variant.sku || `SHOPIFY-${p.id}-${variant.id}`,
-          description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '',
-          price: parseFloat(variant.price || '0'),
-          quantity: 0,
-          minQuantity: 5,
-          category: p.product_type || 'Uncategorized',
-          imageUrl: variantImage,
-        });
-      }
+      // "Unique and active products only" - we take only the main product entry
+      // and ignore individual variants (Size/Color) to avoid duplicate cards.
+      const variant = p.variants?.[0] || {};
+      const variantImage = p.image?.src || '';
+      
+      transformedProducts.push({
+        name: p.title,
+        sku: variant.sku || `SHOPIFY-${p.id}`,
+        description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '',
+        price: parseFloat(variant.price || '0'),
+        quantity: 0, // Stock managed in Firebase
+        minQuantity: 5,
+        category: p.product_type || 'Uncategorized',
+        imageUrl: variantImage,
+      });
     }
 
     return res.status(200).json({ 
