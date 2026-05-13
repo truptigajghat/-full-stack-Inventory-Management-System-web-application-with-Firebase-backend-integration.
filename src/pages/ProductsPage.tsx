@@ -157,8 +157,6 @@ export default function ProductsPage() {
     let nextPageInfo = null;
     const syncedIds = new Set();
     const processedNames = new Set();
-    const skuToId = new Map(products.map(p => [p.sku, p.id]));
-    const nameToId = new Map(products.map(p => [p.name, p.id]));
 
     try {
       do {
@@ -181,61 +179,52 @@ export default function ProductsPage() {
         totalSynced += shopifyProducts.length;
 
         if (shopifyProducts.length > 0) {
-          toast.info(`Syncing items... (${totalSynced} unique items found)`);
+          toast.info(`Consolidating unique products... (${totalSynced} items)`);
           
           const batchSize = 5;
           for (let i = 0; i < shopifyProducts.length; i += batchSize) {
             const chunk = shopifyProducts.slice(i, i + batchSize);
-            const results = await Promise.all(chunk.map(async (sp: any) => {
-              if (processedNames.has(sp.name)) return null;
+            await Promise.all(chunk.map(async (sp: any) => {
+              if (processedNames.has(sp.name)) return;
               processedNames.add(sp.name);
 
-              // Match by SKU or exact Name to consolidate variants
-              const existingId = skuToId.get(sp.sku) || nameToId.get(sp.name);
+              // AGGRESSIVE MATCHING: Find ANY product that starts with this name
+              // This catches "Saree - Red", "Saree - Blue", etc. and merges them.
+              const matches = products.filter(p => 
+                p.name === sp.name || 
+                p.name.startsWith(sp.name) || 
+                sp.name.startsWith(p.name)
+              );
               
-              if (existingId) {
-                await updateProduct(existingId, {
-                  name: sp.name,
-                  sku: sp.sku,
-                  imageUrl: sp.imageUrl,
+              if (matches.length > 0) {
+                // Keep the first match, update it to the parent info
+                const primary = matches[0];
+                await updateProduct(primary.id, {
+                  ...sp,
+                  quantity: primary.quantity, // Keep their stock
                   source: 'shopify'
                 });
-                syncedIds.add(existingId);
-                return 'updated';
+                syncedIds.add(primary.id);
+                
+                // DELETE ALL OTHER MATCHES (these are the duplicates/variants)
+                const others = matches.slice(1);
+                for (const extra of others) {
+                  await deleteProduct(extra.id);
+                }
               } else {
+                // Brand new product
                 const newId = await addProduct({
                   ...sp,
                   quantity: 0
                 });
                 if (newId) syncedIds.add(newId);
-                return 'added';
               }
             }));
-
-            results.forEach(res => {
-              if (res === 'updated') updated++;
-              if (res === 'added') added++;
-            });
           }
         }
       } while (nextPageInfo);
       
-      // CLEANUP: Delete any Shopify products that were not in the latest sync
-      const productsToDelete = products.filter(p => 
-        (p.source === 'shopify' || (p.sku && p.sku.startsWith('SHOPIFY-'))) && 
-        !syncedIds.has(p.id)
-      );
-      
-      if (productsToDelete.length > 0) {
-        toast.info(`Cleaning up ${productsToDelete.length} duplicate variants...`);
-        // Use small batches for deletion to avoid Firestore contention
-        for (let i = 0; i < productsToDelete.length; i += 5) {
-          const chunk = productsToDelete.slice(i, i + 5);
-          await Promise.all(chunk.map(p => deleteProduct(p.id)));
-        }
-      }
-      
-      toast.success(`Full sync complete! Total unique items: ${syncedIds.size}`);
+      toast.success(`Full sync complete! Total unique products: ${syncedIds.size}`);
     } catch (error: any) {
       toast.error(`Sync failed: ${error.message}`);
     } finally {
