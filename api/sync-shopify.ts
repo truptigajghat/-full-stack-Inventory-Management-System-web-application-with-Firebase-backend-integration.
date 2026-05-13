@@ -45,40 +45,56 @@ export default async function handler(req: any, res: any) {
       }
 
       const data = await response.json();
-      allProducts = [...allProducts, ...data.products];
-      console.log(`Fetched page: ${data.products.length} products. Total: ${allProducts.length}`);
+      if (data.products) {
+        allProducts = [...allProducts, ...data.products];
+      }
+      console.log(`Fetched page: ${data.products?.length || 0} products. Total: ${allProducts.length}`);
 
-      // Robust parsing for Shopify Link header
+      // Ultra-robust parsing for Shopify Link header
       const linkHeader = response.headers.get('Link') || response.headers.get('link');
-      console.log(`Link Header: ${linkHeader}`);
-      
       let nextUrl = null;
+      
       if (linkHeader) {
-        const matches = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-        if (matches) {
-          nextUrl = matches[1];
-          console.log(`Found next page URL: ${nextUrl}`);
+        // Shopify Link header looks like: <url>; rel="next", <url>; rel="previous"
+        const links = linkHeader.split(',');
+        for (const link of links) {
+          const [urlPart, relPart] = link.split(';');
+          if (relPart && relPart.includes('rel="next"')) {
+            const match = urlPart.match(/<([^>]+)>/);
+            if (match) {
+              nextUrl = match[1];
+            }
+          }
         }
       }
+      
       url = nextUrl;
+      if (url) console.log(`Following next page: ${url}`);
     }
     
     // Transform Shopify products to match our app's Product format
-    const transformedProducts = allProducts.map((p: any) => {
-      // Get the first variant for price and quantity
-      const firstVariant = p.variants?.[0] || {};
-      
-      return {
-        name: p.title,
-        sku: firstVariant.sku || `SHOPIFY-${p.id}`,
-        description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '', // strip HTML tags
-        price: parseFloat(firstVariant.price || '0'),
-        quantity: firstVariant.inventory_quantity || 0,
-        minQuantity: 5, // default
-        category: p.product_type || 'Uncategorized',
-        imageUrl: p.image?.src || '',
-      };
-    });
+    const transformedProducts: any[] = [];
+    
+    for (const p of allProducts) {
+      // Create a separate product entry for each variant (Size, Color, etc.)
+      // This is essential for fashion stores
+      const variants = p.variants || [];
+      for (const variant of variants) {
+        // Use variant-specific image if available, fallback to main product image
+        const variantImage = p.images?.find((img: any) => img.variant_ids?.includes(variant.id))?.src || p.image?.src || '';
+        
+        transformedProducts.push({
+          name: variant.title === 'Default Title' ? p.title : `${p.title} - ${variant.title}`,
+          sku: variant.sku || `SHOPIFY-${p.id}-${variant.id}`,
+          description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '', // strip HTML tags
+          price: parseFloat(variant.price || '0'),
+          quantity: 0, // Default to 0, will be managed in Firebase
+          minQuantity: 5, // default
+          category: p.product_type || 'Uncategorized',
+          imageUrl: variantImage,
+        });
+      }
+    }
 
     return res.status(200).json({ products: transformedProducts });
     
