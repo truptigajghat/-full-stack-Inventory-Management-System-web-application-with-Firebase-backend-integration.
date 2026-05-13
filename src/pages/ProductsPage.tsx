@@ -20,7 +20,8 @@ import {
   AlertTriangle,
   Image as ImageIcon,
   Eye,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -70,6 +71,7 @@ export default function ProductsPage() {
   const [hoveredProductId, setHoveredProductId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isSyncingShopify, setIsSyncingShopify] = useState(false);
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -135,6 +137,53 @@ export default function ProductsPage() {
     doc.save('inventory-report.pdf');
   };
 
+  const handleShopifySync = async () => {
+    setIsSyncingShopify(true);
+    try {
+      const response = await fetch('/api/sync-shopify');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to fetch from Shopify');
+      }
+      
+      const data = await response.json();
+      const shopifyProducts = data.products || [];
+      
+      if (shopifyProducts.length === 0) {
+        toast.info('No products found on Shopify.');
+        setIsSyncingShopify(false);
+        return;
+      }
+      
+      let added = 0;
+      let updated = 0;
+      
+      for (const sp of shopifyProducts) {
+        const existingProduct = products.find(p => p.sku === sp.sku);
+        if (existingProduct) {
+          await updateProduct(existingProduct.id, {
+            name: sp.name,
+            description: sp.description,
+            price: sp.price,
+            quantity: sp.quantity,
+            category: sp.category,
+            imageUrl: sp.imageUrl || existingProduct.imageUrl,
+          });
+          updated++;
+        } else {
+          await addProduct(sp);
+          added++;
+        }
+      }
+      
+      toast.success(`Shopify sync complete! Added ${added}, Updated ${updated}.`);
+    } catch (error: any) {
+      toast.error(`Sync failed: ${error.message}`);
+    } finally {
+      setIsSyncingShopify(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -157,6 +206,15 @@ export default function ProductsPage() {
           <Button variant="outline" onClick={exportPDF} className="rounded-full">
             <Download className="mr-2 h-4 w-4" />
             Export
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleShopifySync} 
+            disabled={isSyncingShopify} 
+            className="rounded-full bg-[#f3fbf7] text-[#008060] border-[#008060]/20 hover:bg-[#e7f7ef] hover:text-[#005e46]"
+          >
+            <RefreshCw className={cn("mr-2 h-4 w-4", isSyncingShopify && "animate-spin")} />
+            {isSyncingShopify ? 'Syncing...' : 'Shopify Sync'}
           </Button>
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <DialogTrigger asChild>
