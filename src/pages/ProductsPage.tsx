@@ -471,8 +471,6 @@ export default function ProductsPage() {
         </Table>
       </Card>
 
-      />
-
       {/* Shopify Settings Modal */}
       <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
