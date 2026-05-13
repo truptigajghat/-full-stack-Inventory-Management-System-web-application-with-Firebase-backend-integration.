@@ -33,6 +33,7 @@ import {
   DialogDescription,
 } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 import { Product } from '../types';
 import jsPDF from 'jspdf';
