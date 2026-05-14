@@ -64,9 +64,7 @@ export default function ProductsPage() {
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   const getProductStock = (p: any) => {
-    const currentVariantId = selectedVariants[p.id] || p.variants?.[0]?.id;
-    const currentVariant = p.variants?.find((v: any) => v.id === currentVariantId) || null;
-    return currentVariant?.quantity ?? p.quantity;
+    return p.quantity;
   };
 
   const filteredProducts = products.filter(p => 
@@ -148,15 +146,8 @@ export default function ProductsPage() {
       const changesByProduct: Record<string, { quantity?: number, variants?: Record<string, number> }> = {};
       
       for (const key of changeIds) {
-        const [productId, variantId] = key.split('_');
-        if (!changesByProduct[productId]) changesByProduct[productId] = {};
-        
-        if (variantId) {
-          if (!changesByProduct[productId].variants) changesByProduct[productId].variants = {};
-          changesByProduct[productId].variants![variantId] = Number(stockChanges[key]) || 0;
-        } else {
-          changesByProduct[productId].quantity = Number(stockChanges[key]) || 0;
-        }
+        if (!changesByProduct[key]) changesByProduct[key] = {};
+        changesByProduct[key].quantity = Number(stockChanges[key]) || 0;
       }
 
       for (const productId of Object.keys(changesByProduct)) {
@@ -167,13 +158,6 @@ export default function ProductsPage() {
         const updates: Partial<Product> = {};
         if (changes.quantity !== undefined) {
           updates.quantity = changes.quantity;
-        }
-        if (changes.variants && product.variants) {
-          updates.variants = product.variants.map(v => 
-            changes.variants![v.id] !== undefined 
-              ? { ...v, quantity: changes.variants![v.id] } 
-              : v
-          );
         }
         await updateProduct(productId, updates);
       }
@@ -493,9 +477,9 @@ export default function ProductsPage() {
         {filteredProducts.map((p) => {
           const currentVariantId = selectedVariants[p.id] || p.variants?.[0]?.id;
           const currentVariant = p.variants?.find(v => v.id === currentVariantId) || null;
-          const stockKey = currentVariant ? `${p.id}_${currentVariant.id}` : p.id;
+          const stockKey = p.id;
           
-          const currentStock = stockChanges[stockKey] !== undefined ? stockChanges[stockKey] : (currentVariant?.quantity ?? p.quantity);
+          const currentStock = stockChanges[stockKey] !== undefined ? stockChanges[stockKey] : p.quantity;
           const isLowStock = currentStock > 0 && currentStock <= p.minQuantity;
           const isOutOfStock = currentStock === 0;
 
