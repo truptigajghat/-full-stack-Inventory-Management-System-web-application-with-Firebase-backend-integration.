@@ -36,11 +36,11 @@ export function Sidebar({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className={cn("flex h-full w-64 flex-col border-r bg-card/50 backdrop-blur-xl", className)}>
-      <div className="flex h-16 items-center border-b px-6">
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-          <div className="bg-primary h-8 w-8 rounded-lg flex items-center justify-center text-primary-foreground">
-            <Package className="h-5 w-5" />
+    <div className={cn("flex h-full w-64 flex-col border-r border-white/5 bg-background/60 backdrop-blur-3xl", className)}>
+      <div className="flex h-20 items-center border-b border-white/5 px-8">
+        <Link to="/" className="flex items-center gap-3 font-medium text-xl tracking-[0.1em] uppercase">
+          <div className="bg-primary h-6 w-6 rounded-sm flex items-center justify-center text-primary-foreground shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+            <Package className="h-3.5 w-3.5" />
           </div>
           <span>StockPro</span>
         </Link>
@@ -55,8 +55,8 @@ export function Sidebar({ className }: { className?: string }) {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all hover:bg-accent",
-                  isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                  "group flex items-center gap-4 rounded-xl px-4 py-3 text-xs font-semibold tracking-wider uppercase transition-all duration-300",
+                  isActive ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                 )}
               >
                 <item.icon className={cn("h-4 w-4", isActive ? "text-primary" : "group-hover:text-primary")} />
@@ -67,7 +67,7 @@ export function Sidebar({ className }: { className?: string }) {
         </nav>
       </div>
 
-      <div className="border-t p-4 space-y-4">
+      <div className="border-t border-white/5 p-6 space-y-6">
         <div className="flex items-center justify-between px-2">
            <Button
             variant="ghost"
@@ -88,7 +88,7 @@ export function Sidebar({ className }: { className?: string }) {
             <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col truncate">
-            <span className="text-sm font-medium truncate">{user?.displayName || user?.email?.split('@')[0]}</span>
+            <span className="text-xs font-bold tracking-wider uppercase truncate">{user?.displayName || user?.email?.split('@')[0]}</span>
             <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
           </div>
         </div>

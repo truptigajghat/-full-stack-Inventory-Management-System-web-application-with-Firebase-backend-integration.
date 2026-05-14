@@ -11,7 +11,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col lg:pl-64">
         <MobileNav />
-        <main className="flex-1 p-4 md:p-8 lg:p-10 max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-6 md:p-12 lg:p-16 max-w-[1600px] mx-auto w-full">
           {children}
         </main>
       </div>

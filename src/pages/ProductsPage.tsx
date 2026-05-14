@@ -501,7 +501,7 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-x-8 gap-y-16">
         {filteredProducts.map((p) => {
           const currentVariantId = selectedVariants[p.id] || p.variants?.[0]?.id;
           const currentVariant = p.variants?.find(v => v.id === currentVariantId) || null;
@@ -513,12 +513,12 @@ export default function ProductsPage() {
 
           return (
             <Card key={p.id} className="group border-none shadow-none bg-transparent overflow-hidden flex flex-col">
-              <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted mb-4 shadow-sm group-hover:shadow-2xl transition-all duration-500 border border-muted/50">
+              <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-muted mb-5 shadow-sm transition-all duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-hover:shadow-2xl">
                 {p.imageUrl ? (
                   <img 
                     src={p.imageUrl} 
                     alt={p.name} 
-                    className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-1000 ease-[cubic-bezier(0.2,0.8,0.2,1)]" 
                   />
                 ) : (
                   <div className="h-full w-full flex items-center justify-center">
@@ -526,46 +526,53 @@ export default function ProductsPage() {
                   </div>
                 )}
                 
-                <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
+                <div className="absolute top-4 right-4 flex flex-col gap-2 items-end z-10">
                   <div className={cn(
-                    "px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase backdrop-blur-md shadow-sm border border-white/20",
-                    isOutOfStock ? "bg-rose-500/80 text-white" : 
-                    isLowStock ? "bg-amber-500/80 text-white" : 
-                    "bg-emerald-500/80 text-white"
+                    "px-3 py-1.5 rounded-full text-[9px] font-bold tracking-[0.2em] uppercase backdrop-blur-md shadow-lg border",
+                    isOutOfStock ? "bg-rose-950/40 text-rose-100 border-rose-500/30" : 
+                    isLowStock ? "bg-amber-950/40 text-amber-100 border-amber-500/30" : 
+                    "bg-black/40 text-white border-white/20"
                   )}>
                     {isOutOfStock ? "Sold Out" : isLowStock ? "Low Stock" : "In Stock"}
                   </div>
                   {p.storeName && (
                     <div className={cn(
-                      "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter backdrop-blur-md shadow-sm border border-white/10 text-white",
-                      p.storeName.includes('1') ? "bg-blue-600/70" :
-                      p.storeName.includes('2') ? "bg-purple-600/70" :
-                      p.storeName.includes('3') ? "bg-orange-600/70" :
-                      "bg-indigo-600/70"
+                      "px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] backdrop-blur-md shadow-lg border border-white/10 text-white flex items-center gap-1.5",
+                      p.storeName.includes('1') ? "bg-blue-950/60" :
+                      p.storeName.includes('2') ? "bg-purple-950/60" :
+                      p.storeName.includes('3') ? "bg-orange-950/60" :
+                      "bg-black/40"
                     )}>
+                      <div className={cn(
+                        "w-1.5 h-1.5 rounded-full",
+                        p.storeName.includes('1') ? "bg-blue-400" :
+                        p.storeName.includes('2') ? "bg-purple-400" :
+                        p.storeName.includes('3') ? "bg-orange-400" :
+                        "bg-white"
+                      )} />
                       {p.storeName}
                     </div>
                   )}
                 </div>
               </div>
               
-              <div className="space-y-4 px-1">
+              <div className="space-y-5 px-1">
                 <div>
-                  <h3 className="font-semibold text-lg line-clamp-1 leading-tight group-hover:text-primary transition-colors">
+                  <h3 className="font-serif text-xl line-clamp-1 leading-tight group-hover:text-primary transition-colors">
                     {p.name}
                   </h3>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium mt-1.5">
+                  <p className="text-[9px] text-muted-foreground/70 uppercase tracking-[0.3em] font-bold mt-2">
                     {currentVariant?.sku || p.sku}
                   </p>
 
                   {p.variants && p.variants.length > 0 && (
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-5 space-y-0.5">
                       {p.variants.map(v => {
                         const vStockKey = `${p.id}_${v.id}`;
                         const vStock = stockChanges[vStockKey] !== undefined ? stockChanges[vStockKey] : v.quantity;
                         return (
-                          <div key={v.id} className="flex items-center justify-between gap-3 bg-muted/20 p-2 rounded-lg border border-muted/50">
-                            <span className="text-xs font-bold text-muted-foreground truncate">{v.title}</span>
+                          <div key={v.id} className="flex items-center justify-between gap-4 group/variant py-1 border-b border-border/40 hover:border-primary/50 transition-colors">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] truncate group-hover/variant:text-foreground transition-colors">{v.title}</span>
                             <Input 
                               type="number" 
                               value={vStock} 
@@ -573,7 +580,7 @@ export default function ProductsPage() {
                                 const val = e.target.value;
                                 setStockChanges(prev => ({ ...prev, [vStockKey]: val === '' ? '' : Number(val) }));
                               }}
-                              className="h-7 w-20 text-right font-bold text-xs bg-background/50 border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary/30"
+                              className="h-6 w-16 text-right font-medium text-xs bg-transparent border-none shadow-none focus-visible:ring-0 focus-visible:border-primary px-0 rounded-none transition-all"
                             />
                           </div>
                         );
@@ -582,11 +589,11 @@ export default function ProductsPage() {
                   )}
                 </div>
                 
-                <div className="flex items-center justify-between gap-4 pt-3 border-t border-muted/50 mt-auto">
-                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                <div className="flex items-end justify-between gap-4 pt-4 mt-auto">
+                  <span className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-[0.3em]">
                     Total Stock
                   </span>
-                  <div className="relative w-24">
+                  <div className="relative">
                     <Input 
                       type="number" 
                       value={currentStock}
@@ -598,8 +605,8 @@ export default function ProductsPage() {
                         }
                       }}
                       className={cn(
-                        "h-10 text-right font-bold bg-muted/40 border-none shadow-none rounded-xl focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
-                        (p.variants && p.variants.length > 0) ? "opacity-70 cursor-not-allowed" : "",
+                        "h-8 w-20 text-right font-serif text-2xl bg-transparent border-none shadow-none rounded-none focus-visible:ring-0 px-0 transition-all",
+                        (p.variants && p.variants.length > 0) ? "opacity-60 cursor-not-allowed" : "border-b border-border/40 focus-visible:border-primary",
                         isOutOfStock && currentStock !== '' ? "text-rose-500" : 
                         isLowStock && currentStock !== '' ? "text-amber-500" : "text-foreground"
                       )}
