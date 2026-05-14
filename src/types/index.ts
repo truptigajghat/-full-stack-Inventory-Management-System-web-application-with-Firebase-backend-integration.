@@ -1,3 +1,11 @@
+export interface ProductVariant {
+  id: string;
+  title: string;
+  sku: string;
+  price: number;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -16,6 +24,7 @@ export interface Product {
   storeDomain?: string;
   variantId?: string;
   source?: string;
+  variants?: ProductVariant[];
 }
 
 export interface ShopifyStoreConfig {

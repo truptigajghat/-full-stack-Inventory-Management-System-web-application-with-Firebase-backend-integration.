@@ -61,6 +61,7 @@ export default function ProductsPage() {
   const [stockChanges, setStockChanges] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [editedStores, setEditedStores] = useState<any[]>([]);
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   const filteredProducts = products.filter(p => 
     (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -137,9 +138,38 @@ export default function ProductsPage() {
 
     setIsSaving(true);
     try {
-      for (const id of changeIds) {
-        const newQuantity = stockChanges[id];
-        await updateProduct(id, { quantity: newQuantity });
+      // Group changes by productId to avoid race conditions when updating variants
+      const changesByProduct: Record<string, { quantity?: number, variants?: Record<string, number> }> = {};
+      
+      for (const key of changeIds) {
+        const [productId, variantId] = key.split('_');
+        if (!changesByProduct[productId]) changesByProduct[productId] = {};
+        
+        if (variantId) {
+          if (!changesByProduct[productId].variants) changesByProduct[productId].variants = {};
+          changesByProduct[productId].variants![variantId] = stockChanges[key];
+        } else {
+          changesByProduct[productId].quantity = stockChanges[key];
+        }
+      }
+
+      for (const productId of Object.keys(changesByProduct)) {
+        const changes = changesByProduct[productId];
+        const product = products.find(p => p.id === productId);
+        if (!product) continue;
+
+        const updates: Partial<Product> = {};
+        if (changes.quantity !== undefined) {
+          updates.quantity = changes.quantity;
+        }
+        if (changes.variants && product.variants) {
+          updates.variants = product.variants.map(v => 
+            changes.variants![v.id] !== undefined 
+              ? { ...v, quantity: changes.variants![v.id] } 
+              : v
+          );
+        }
+        await updateProduct(productId, updates);
       }
       setStockChanges({});
       toast.success('Stock updated successfully');
@@ -211,6 +241,10 @@ export default function ProductsPage() {
                     storeName: sp.storeName,
                     storeDomain: sp.storeDomain,
                     variantId: sp.variantId,
+                    variants: sp.variants ? sp.variants.map((v: any) => {
+                      const existingV = existingProduct.variants?.find(ev => ev.id === v.id);
+                      return { ...v, quantity: existingV ? existingV.quantity : 0 };
+                    }) : [],
                     source: 'shopify'
                   });
                   syncedIds.add(existingProduct.id);
@@ -451,7 +485,11 @@ export default function ProductsPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
         {filteredProducts.map((p) => {
-          const currentStock = stockChanges[p.id] !== undefined ? stockChanges[p.id] : p.quantity;
+          const currentVariantId = selectedVariants[p.id] || p.variants?.[0]?.id;
+          const currentVariant = p.variants?.find(v => v.id === currentVariantId) || null;
+          const stockKey = currentVariant ? `${p.id}_${currentVariant.id}` : p.id;
+          
+          const currentStock = stockChanges[stockKey] !== undefined ? stockChanges[stockKey] : (currentVariant?.quantity ?? p.quantity);
           const isLowStock = currentStock > 0 && currentStock <= p.minQuantity;
           const isOutOfStock = currentStock === 0;
 
@@ -499,8 +537,27 @@ export default function ProductsPage() {
                     {p.name}
                   </h3>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium mt-1.5">
-                    {p.sku}
+                    {currentVariant?.sku || p.sku}
                   </p>
+
+                  {p.variants && p.variants.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {p.variants.map(v => (
+                        <button
+                          key={v.id}
+                          onClick={() => setSelectedVariants(prev => ({...prev, [p.id]: v.id}))}
+                          className={cn(
+                            "px-2 py-0.5 text-[10px] font-bold rounded-md border transition-all",
+                            currentVariantId === v.id 
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm" 
+                              : "bg-muted/30 text-muted-foreground border-muted-foreground/20 hover:border-primary/50"
+                          )}
+                        >
+                          {v.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center justify-between gap-4 pt-3 border-t border-muted/50">
@@ -514,7 +571,7 @@ export default function ProductsPage() {
                       onChange={(e) => {
                         const val = parseInt(e.target.value);
                         if (!isNaN(val)) {
-                          setStockChanges(prev => ({ ...prev, [p.id]: val }));
+                          setStockChanges(prev => ({ ...prev, [stockKey]: val }));
                         }
                       }}
                       className={cn(

@@ -89,12 +89,20 @@ export default async function handler(req: any, res: any) {
       // Use the first variant for price/sku, or fallback
       const defaultVariant = p.variants?.[0] || {};
       
+      const productVariants = (p.variants || []).map((v: any) => ({
+        id: v.id.toString(),
+        title: v.title === 'Default Title' ? 'Default' : v.title,
+        sku: v.sku || `SHOPIFY-${p.id}-${v.id}`,
+        price: parseFloat(v.price || '0'),
+        quantity: 0, // Stock managed in Firebase
+      }));
+
       transformedProducts.push({
         name: p.title,
         sku: defaultVariant.sku || `SHOPIFY-${p.id}`,
         description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '',
         price: parseFloat(defaultVariant.price || '0'),
-        quantity: 0, // Stock managed in Firebase
+        quantity: 0, // Fallback base stock
         minQuantity: 5,
         category: p.product_type || 'Uncategorized',
         imageUrl: p.image?.src || p.images?.[0]?.src || '',
@@ -102,6 +110,7 @@ export default async function handler(req: any, res: any) {
         storeDomain: SHOPIFY_STORE_DOMAIN,
         // We keep the default variant ID so it matches the first synced variant and preserves its stock
         variantId: defaultVariant.id?.toString() || p.id.toString(),
+        variants: productVariants,
         source: 'shopify',
       });
     }
