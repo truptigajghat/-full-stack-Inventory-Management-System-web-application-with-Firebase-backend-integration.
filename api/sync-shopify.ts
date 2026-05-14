@@ -81,32 +81,29 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // Transform Shopify products into variant-level items for multi-store tracking
+    // Transform Shopify products into base items (no variants) to prevent duplicates
     const transformedProducts: any[] = [];
     const storeName = req.headers['x-shopify-store-name'] as string || 'Unknown Store';
     
     for (const p of products) {
-      const variants = p.variants || [];
-      for (const variant of variants) {
-        // Use variant-specific image if available, fallback to main product image
-        const variantImage = p.images?.find((img: any) => img.variant_ids?.includes(variant.id))?.src || p.image?.src || '';
-        
-        transformedProducts.push({
-          // Combine title and variant for clear tracking (e.g., "Saree - Red / XL")
-          name: variant.title === 'Default Title' ? p.title : `${p.title} - ${variant.title}`,
-          sku: variant.sku || `SHOPIFY-${p.id}-${variant.id}`,
-          description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '',
-          price: parseFloat(variant.price || '0'),
-          quantity: 0, // Stock managed in Firebase
-          minQuantity: 5,
-          category: p.product_type || 'Uncategorized',
-          imageUrl: variantImage,
-          storeName: storeName,
-          storeDomain: SHOPIFY_STORE_DOMAIN,
-          variantId: variant.id.toString(),
-          source: 'shopify',
-        });
-      }
+      // Use the first variant for price/sku, or fallback
+      const defaultVariant = p.variants?.[0] || {};
+      
+      transformedProducts.push({
+        name: p.title,
+        sku: defaultVariant.sku || `SHOPIFY-${p.id}`,
+        description: p.body_html ? p.body_html.replace(/<[^>]+>/g, '') : '',
+        price: parseFloat(defaultVariant.price || '0'),
+        quantity: 0, // Stock managed in Firebase
+        minQuantity: 5,
+        category: p.product_type || 'Uncategorized',
+        imageUrl: p.image?.src || p.images?.[0]?.src || '',
+        storeName: storeName,
+        storeDomain: SHOPIFY_STORE_DOMAIN,
+        // We keep the default variant ID so it matches the first synced variant and preserves its stock
+        variantId: defaultVariant.id?.toString() || p.id.toString(),
+        source: 'shopify',
+      });
     }
 
     return res.status(200).json({ 
