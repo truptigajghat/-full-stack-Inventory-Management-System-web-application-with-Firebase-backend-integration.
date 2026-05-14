@@ -45,10 +45,10 @@ export default function Dashboard() {
   const recentTransactions = transactions.slice(0, 5);
 
   const stats = [
-    { title: 'Total Products', value: totalProducts, icon: Package, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { title: 'Total Stock', value: totalStock, icon: Boxes, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { title: 'Low Stock', value: lowStockItems, icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { title: 'Out of Stock', value: outOfStockItems, icon: TrendingUp, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+    { title: 'Total Products', value: totalProducts, icon: Package, color: 'text-foreground' },
+    { title: 'Total Stock', value: totalStock, icon: Boxes, color: 'text-foreground' },
+    { title: 'Low Stock', value: lowStockItems, icon: AlertTriangle, color: 'text-amber-500' },
+    { title: 'Out of Stock', value: outOfStockItems, icon: TrendingUp, color: 'text-rose-500' },
   ];
 
   if (loading) {
@@ -67,20 +67,20 @@ export default function Dashboard() {
           </p>
         </div>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-4 border-b border-border/40">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>
-          <p className="text-muted-foreground text-sm mt-1">Real-time statistics and inventory tracking.</p>
+          <h1 className="text-3xl font-serif tracking-tight">Dashboard Overview</h1>
+          <p className="text-muted-foreground text-[10px] uppercase tracking-[0.2em] font-bold mt-2">Real-time statistics and inventory tracking.</p>
         </div>
         <Link to="/products">
-          <Button className="rounded-full shadow-lg shadow-primary/20">
-            <Plus className="mr-2 h-4 w-4" />
+          <Button className="rounded-none shadow-xl tracking-[0.2em] uppercase text-[9px] font-bold px-6 h-10">
+            <Plus className="mr-2 h-3.5 w-3.5" />
             Add Product
           </Button>
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, i) => (
           <motion.div
             key={stat.title}
@@ -88,25 +88,25 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
           >
-            <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
+            <Card className="border border-border/40 bg-background/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:border-primary/50 transition-all duration-700 group rounded-none">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-                <div className={`${stat.bg} ${stat.color} p-2 rounded-lg`}>
-                  <stat.icon className="h-4 w-4" />
+                <CardTitle className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground">{stat.title}</CardTitle>
+                <div className={`${stat.color} transition-transform duration-700 group-hover:scale-110`}>
+                  <stat.icon className="h-4 w-4 opacity-70" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
+                <div className="text-4xl font-serif mt-2">{stat.value}</div>
               </CardContent>
             </Card>
           </motion.div>
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4 border-none shadow-sm">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4 border border-border/40 bg-background/40 backdrop-blur-xl shadow-sm rounded-none">
           <CardHeader>
-            <CardTitle>Inventory Levels</CardTitle>
+            <CardTitle className="font-serif text-xl">Inventory Levels</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -118,49 +118,52 @@ export default function Dashboard() {
                   cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                 />
-                <Bar dataKey="stock" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={40} />
+                <Bar dataKey="stock" fill="currentColor" className="fill-foreground opacity-90" radius={[2, 2, 0, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card className="col-span-3 border-none shadow-sm">
+        <Card className="col-span-3 border border-border/40 bg-background/40 backdrop-blur-xl shadow-sm rounded-none">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="font-serif text-xl">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-1">
               {recentTransactions.length > 0 ? (
                 recentTransactions.map((tx) => {
                   const product = products.find(p => p.id === tx.productId);
                   return (
-                    <div key={tx.id} className="flex items-center gap-3">
+                    <div key={tx.id} className="flex items-center gap-4 py-3 border-b border-border/40 group hover:border-primary/50 transition-colors">
                       <div className={cn(
-                        "p-2 rounded-full",
-                        tx.type === 'IN' ? "bg-emerald-500/10 text-emerald-500" : 
-                        tx.type === 'OUT' ? "bg-rose-500/10 text-rose-500" : 
-                        "bg-blue-500/10 text-blue-500"
+                        "transition-transform duration-500 group-hover:scale-110",
+                        tx.type === 'IN' ? "text-emerald-500/80" : 
+                        tx.type === 'OUT' ? "text-rose-500/80" : 
+                        "text-foreground/50"
                       )}>
                         {tx.type === 'IN' ? <ArrowUpRight className="h-4 w-4" /> : 
                          tx.type === 'OUT' ? <ArrowDownRight className="h-4 w-4" /> : 
                          <ArrowLeftRight className="h-4 w-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{product?.name || 'Unknown Product'}</p>
-                        <p className="text-xs text-muted-foreground">{format(tx.createdAt?.toDate() || new Date(), 'MMM dd, HH:mm')}</p>
+                        <p className="text-[11px] font-bold uppercase tracking-widest truncate">{product?.name || 'Unknown Product'}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-[0.2em] mt-1">{format(tx.createdAt?.toDate() || new Date(), 'MMM dd, HH:mm')}</p>
                       </div>
-                      <Badge variant={tx.type === 'IN' ? 'default' : tx.type === 'OUT' ? 'destructive' : 'secondary'}>
+                      <div className={cn(
+                        "text-sm font-serif",
+                        tx.type === 'IN' ? "text-emerald-500" : tx.type === 'OUT' ? "text-rose-500" : "text-foreground"
+                      )}>
                         {tx.type === 'IN' ? '+' : tx.type === 'OUT' ? '-' : ''}{tx.quantity}
-                      </Badge>
+                      </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="text-center py-10 text-muted-foreground text-sm italic">No recent activity</div>
+                <div className="text-center py-10 text-muted-foreground text-[10px] tracking-widest uppercase">No recent activity</div>
               )}
             </div>
             <Link to="/transactions">
-              <Button variant="ghost" className="w-full mt-4 text-xs">View all transactions</Button>
+              <Button variant="ghost" className="w-full mt-6 text-[10px] font-bold tracking-widest uppercase rounded-none border border-transparent hover:border-border/40 transition-all">View all transactions</Button>
             </Link>
           </CardContent>
         </Card>
