@@ -66,8 +66,7 @@ export default function ProductsPage() {
   const getProductStock = (p: any) => {
     const currentVariantId = selectedVariants[p.id] || p.variants?.[0]?.id;
     const currentVariant = p.variants?.find((v: any) => v.id === currentVariantId) || null;
-    const stockKey = currentVariant ? `${p.id}_${currentVariant.id}` : p.id;
-    return stockChanges[stockKey] !== undefined ? stockChanges[stockKey] : (currentVariant?.quantity ?? p.quantity);
+    return currentVariant?.quantity ?? p.quantity;
   };
 
   const filteredProducts = products.filter(p => 
