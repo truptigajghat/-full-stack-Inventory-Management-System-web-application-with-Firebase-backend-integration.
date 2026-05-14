@@ -541,21 +541,22 @@ export default function ProductsPage() {
                   </p>
 
                   {p.variants && p.variants.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {p.variants.map(v => (
-                        <button
-                          key={v.id}
-                          onClick={() => setSelectedVariants(prev => ({...prev, [p.id]: v.id}))}
-                          className={cn(
-                            "px-2 py-0.5 text-[10px] font-bold rounded-md border transition-all",
-                            currentVariantId === v.id 
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm" 
-                              : "bg-muted/30 text-muted-foreground border-muted-foreground/20 hover:border-primary/50"
-                          )}
-                        >
-                          {v.title}
-                        </button>
-                      ))}
+                    <div className="mt-3">
+                      <Select
+                        value={currentVariantId}
+                        onValueChange={(val: any) => setSelectedVariants(prev => ({...prev, [p.id]: val}))}
+                      >
+                        <SelectTrigger className="h-7 text-xs bg-muted/30 border-muted-foreground/20 shadow-none rounded-md px-2 focus:ring-1 focus:ring-primary/30">
+                          <SelectValue placeholder="Select Size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {p.variants.map(v => (
+                            <SelectItem key={v.id} value={v.id} className="text-xs">
+                              {v.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
                 </div>
