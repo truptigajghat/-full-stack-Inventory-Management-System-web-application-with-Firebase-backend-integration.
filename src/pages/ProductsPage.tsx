@@ -64,7 +64,14 @@ export default function ProductsPage() {
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   const getProductStock = (p: any) => {
-    return p.quantity;
+    if (p.variants && p.variants.length > 0) {
+      return p.variants.reduce((acc: number, v: any) => {
+        const stockKey = `${p.id}_${v.id}`;
+        const vStock = stockChanges[stockKey] !== undefined ? stockChanges[stockKey] : v.quantity;
+        return acc + (Number(vStock) || 0);
+      }, 0);
+    }
+    return stockChanges[p.id] !== undefined ? stockChanges[p.id] : p.quantity;
   };
 
   const filteredProducts = products.filter(p => 
@@ -146,8 +153,15 @@ export default function ProductsPage() {
       const changesByProduct: Record<string, { quantity?: number, variants?: Record<string, number> }> = {};
       
       for (const key of changeIds) {
-        if (!changesByProduct[key]) changesByProduct[key] = {};
-        changesByProduct[key].quantity = Number(stockChanges[key]) || 0;
+        const [productId, variantId] = key.split('_');
+        if (!changesByProduct[productId]) changesByProduct[productId] = {};
+        
+        if (variantId) {
+          if (!changesByProduct[productId].variants) changesByProduct[productId].variants = {};
+          changesByProduct[productId].variants![variantId] = Number(stockChanges[key]) || 0;
+        } else {
+          changesByProduct[productId].quantity = Number(stockChanges[key]) || 0;
+        }
       }
 
       for (const productId of Object.keys(changesByProduct)) {
@@ -158,6 +172,13 @@ export default function ProductsPage() {
         const updates: Partial<Product> = {};
         if (changes.quantity !== undefined) {
           updates.quantity = changes.quantity;
+        }
+        if (changes.variants && product.variants) {
+          updates.variants = product.variants.map(v => 
+            changes.variants![v.id] !== undefined 
+              ? { ...v, quantity: changes.variants![v.id] } 
+              : v
+          );
         }
         await updateProduct(productId, updates);
       }
@@ -479,7 +500,7 @@ export default function ProductsPage() {
           const currentVariant = p.variants?.find(v => v.id === currentVariantId) || null;
           const stockKey = p.id;
           
-          const currentStock = stockChanges[stockKey] !== undefined ? stockChanges[stockKey] : p.quantity;
+          const currentStock = getProductStock(p);
           const isLowStock = currentStock > 0 && currentStock <= p.minQuantity;
           const isOutOfStock = currentStock === 0;
 
@@ -531,40 +552,47 @@ export default function ProductsPage() {
                   </p>
 
                   {p.variants && p.variants.length > 0 && (
-                    <div className="mt-3">
-                      <Select
-                        value={currentVariantId}
-                        onValueChange={(val: any) => setSelectedVariants(prev => ({...prev, [p.id]: val}))}
-                      >
-                        <SelectTrigger className="h-7 text-xs bg-muted/30 border-muted-foreground/20 shadow-none rounded-md px-2 focus:ring-1 focus:ring-primary/30">
-                          <SelectValue placeholder="Select Size" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {p.variants.map(v => (
-                            <SelectItem key={v.id} value={v.id} className="text-xs">
-                              {v.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="mt-4 space-y-2">
+                      {p.variants.map(v => {
+                        const vStockKey = `${p.id}_${v.id}`;
+                        const vStock = stockChanges[vStockKey] !== undefined ? stockChanges[vStockKey] : v.quantity;
+                        return (
+                          <div key={v.id} className="flex items-center justify-between gap-3 bg-muted/20 p-2 rounded-lg border border-muted/50">
+                            <span className="text-xs font-bold text-muted-foreground truncate">{v.title}</span>
+                            <Input 
+                              type="number" 
+                              value={vStock} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setStockChanges(prev => ({ ...prev, [vStockKey]: val === '' ? '' : Number(val) }));
+                              }}
+                              className="h-7 w-20 text-right font-bold text-xs bg-background/50 border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary/30"
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
                 
-                <div className="flex items-center justify-between gap-4 pt-3 border-t border-muted/50">
+                <div className="flex items-center justify-between gap-4 pt-3 border-t border-muted/50 mt-auto">
                   <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-                    Stock Units
+                    Total Stock
                   </span>
                   <div className="relative w-24">
                     <Input 
                       type="number" 
                       value={currentStock}
+                      readOnly={p.variants && p.variants.length > 0}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        setStockChanges(prev => ({ ...prev, [stockKey]: val === '' ? '' : Number(val) }));
+                        if (!p.variants || p.variants.length === 0) {
+                          const val = e.target.value;
+                          setStockChanges(prev => ({ ...prev, [stockKey]: val === '' ? '' : Number(val) }));
+                        }
                       }}
                       className={cn(
                         "h-10 text-right font-bold bg-muted/40 border-none shadow-none rounded-xl focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
+                        (p.variants && p.variants.length > 0) ? "opacity-70 cursor-not-allowed" : "",
                         isOutOfStock && currentStock !== '' ? "text-rose-500" : 
                         isLowStock && currentStock !== '' ? "text-amber-500" : "text-foreground"
                       )}
