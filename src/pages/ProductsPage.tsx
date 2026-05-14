@@ -60,6 +60,7 @@ export default function ProductsPage() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [stockChanges, setStockChanges] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [editedStores, setEditedStores] = useState<any[]>([]);
 
   const filteredProducts = products.filter(p => 
     (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -555,7 +556,19 @@ export default function ProductsPage() {
       </div>
 
       {/* Shopify Settings Modal */}
-      <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
+      <Dialog 
+        open={isSettingsModalOpen} 
+        onOpenChange={(open) => {
+          setIsSettingsModalOpen(open);
+          if (open) {
+            setEditedStores(
+              shopifySettings.length > 0 
+                ? shopifySettings.map((s, i) => ({ ...s, _key: Date.now() + i }))
+                : [{ _key: Date.now() }]
+            );
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-3">
@@ -565,24 +578,24 @@ export default function ProductsPage() {
               Shopify Multi-Store Settings
             </DialogTitle>
             <DialogDescription>
-              Connect up to 4 Shopify stores. All products will be synced into your unified dashboard.
+              Connect unlimited Shopify stores. All products will be synced into your unified dashboard.
             </DialogDescription>
           </DialogHeader>
           <form 
             onSubmit={async (e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
-              const stores: ShopifyStoreConfig[] = [];
+              const stores: any[] = [];
               
-              for (let i = 1; i <= 4; i++) {
+              for (let i = 0; i < editedStores.length; i++) {
                 const name = formData.get(`name_${i}`) as string;
                 const domain = formData.get(`domain_${i}`) as string;
                 const token = formData.get(`token_${i}`) as string;
                 
                 if (domain && token) {
                   stores.push({
-                    id: i.toString(),
-                    name: name || `Store ${i}`,
+                    id: (i + 1).toString(),
+                    name: name || `Store ${i + 1}`,
                     domain,
                     token
                   });
@@ -608,19 +621,35 @@ export default function ProductsPage() {
             className="space-y-6 py-6"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[1, 2, 3, 4].map((i) => {
-                const store = shopifySettings.find(s => s.id === i.toString());
+              {editedStores.map((store, i) => {
                 return (
-                  <div key={i} className="p-4 rounded-2xl bg-muted/30 border border-muted-foreground/10 space-y-4">
-                    <h4 className="font-bold text-sm uppercase tracking-widest text-muted-foreground mb-2 flex items-center justify-between">
-                      Store {i}
-                      {store && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
-                    </h4>
+                  <div key={store._key} className="relative p-4 rounded-2xl bg-muted/30 border border-muted-foreground/10 space-y-4 group">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                        Store {i + 1}
+                        {store.domain && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                      </h4>
+                      {editedStores.length > 1 && (
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            const newStores = [...editedStores];
+                            newStores.splice(i, 1);
+                            setEditedStores(newStores);
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </Button>
+                      )}
+                    </div>
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase font-bold text-muted-foreground">Store Name</Label>
                       <Input 
                         name={`name_${i}`} 
-                        placeholder={`Saree Palace ${i}`} 
+                        placeholder={`Saree Palace ${i + 1}`} 
                         defaultValue={store?.name}
                         className="bg-background/50"
                       />
@@ -648,6 +677,20 @@ export default function ProductsPage() {
                 );
               })}
             </div>
+            
+            <div className="flex justify-center mt-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                className="rounded-full text-xs font-medium border-dashed border-2 hover:border-primary hover:text-primary transition-colors"
+                onClick={() => setEditedStores([...editedStores, { _key: Date.now() }])}
+              >
+                <Plus className="mr-1 h-3 w-3" />
+                Add Another Store
+              </Button>
+            </div>
+
             <DialogFooter className="mt-8 border-t pt-6">
               <Button type="button" variant="ghost" onClick={() => setIsSettingsModalOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={loadingLocal} className="rounded-xl px-8">
