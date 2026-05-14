@@ -63,14 +63,21 @@ export default function ProductsPage() {
   const [editedStores, setEditedStores] = useState<any[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
+  const getProductStock = (p: any) => {
+    const currentVariantId = selectedVariants[p.id] || p.variants?.[0]?.id;
+    const currentVariant = p.variants?.find((v: any) => v.id === currentVariantId) || null;
+    const stockKey = currentVariant ? `${p.id}_${currentVariant.id}` : p.id;
+    return stockChanges[stockKey] !== undefined ? stockChanges[stockKey] : (currentVariant?.quantity ?? p.quantity);
+  };
+
   const filteredProducts = products.filter(p => 
     (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.storeName || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => {
-    if (sortOrder === 'asc') return a.quantity - b.quantity;
-    if (sortOrder === 'desc') return b.quantity - a.quantity;
+    if (sortOrder === 'asc') return getProductStock(a) - getProductStock(b);
+    if (sortOrder === 'desc') return getProductStock(b) - getProductStock(a);
     return 0;
   });
 
