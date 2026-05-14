@@ -58,7 +58,7 @@ export default function ProductsPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSyncingShopify, setIsSyncingShopify] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [stockChanges, setStockChanges] = useState<Record<string, number>>({});
+  const [stockChanges, setStockChanges] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [editedStores, setEditedStores] = useState<any[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
@@ -154,9 +154,9 @@ export default function ProductsPage() {
         
         if (variantId) {
           if (!changesByProduct[productId].variants) changesByProduct[productId].variants = {};
-          changesByProduct[productId].variants![variantId] = stockChanges[key];
+          changesByProduct[productId].variants![variantId] = Number(stockChanges[key]) || 0;
         } else {
-          changesByProduct[productId].quantity = stockChanges[key];
+          changesByProduct[productId].quantity = Number(stockChanges[key]) || 0;
         }
       }
 
@@ -577,15 +577,13 @@ export default function ProductsPage() {
                       type="number" 
                       value={currentStock}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        if (!isNaN(val)) {
-                          setStockChanges(prev => ({ ...prev, [stockKey]: val }));
-                        }
+                        const val = e.target.value;
+                        setStockChanges(prev => ({ ...prev, [stockKey]: val === '' ? '' : Number(val) }));
                       }}
                       className={cn(
                         "h-10 text-right font-bold bg-muted/40 border-none shadow-none rounded-xl focus-visible:ring-2 focus-visible:ring-primary/20 transition-all",
-                        isOutOfStock ? "text-rose-500" : 
-                        isLowStock ? "text-amber-500" : "text-foreground"
+                        isOutOfStock && currentStock !== '' ? "text-rose-500" : 
+                        isLowStock && currentStock !== '' ? "text-amber-500" : "text-foreground"
                       )}
                     />
                   </div>
