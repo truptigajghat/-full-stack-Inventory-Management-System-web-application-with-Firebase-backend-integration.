@@ -74,14 +74,21 @@ export default function ProductsPage() {
     return stockChanges[p.id] !== undefined ? stockChanges[p.id] : p.quantity;
   };
 
+  const getSavedProductStock = (p: any) => {
+    if (p.variants && p.variants.length > 0) {
+      return p.variants.reduce((acc: number, v: any) => acc + (Number(v.quantity) || 0), 0);
+    }
+    return p.quantity;
+  };
+
   const filteredProducts = products.filter(p => 
     (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.storeName || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => {
-    if (sortOrder === 'asc') return getProductStock(a) - getProductStock(b);
-    if (sortOrder === 'desc') return getProductStock(b) - getProductStock(a);
+    if (sortOrder === 'asc') return getSavedProductStock(a) - getSavedProductStock(b);
+    if (sortOrder === 'desc') return getSavedProductStock(b) - getSavedProductStock(a);
     return 0;
   });
 
