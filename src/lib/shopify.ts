@@ -34,17 +34,49 @@ export const fetchShopifyProducts = async (store: ShopifyStoreConfig): Promise<P
     let currentUrl = `https://${cleanDomain}/admin/api/2024-01/products.json?limit=50&status=active`;
 
     while (currentUrl) {
-      const proxiedUrl = `https://corsproxy.io/?${encodeURIComponent(currentUrl)}`;
-      const response = await fetch(proxiedUrl, {
-        method: 'GET',
-        headers: {
-          'X-Shopify-Access-Token': store.token,
-          'Content-Type': 'application/json',
-        },
-      });
+      if (allProducts.length > 0) {
+        // Wait 1.5 seconds between pages to prevent rate limiting from free CORS proxies
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
 
-      if (!response.ok) {
-        throw new Error(`Shopify API responded with status ${response.status}`);
+      // Use api.codetabs.com which is significantly more stable for long URLs and doesn't rate limit as aggressively
+      const proxiedUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(currentUrl.trim())}`;
+      
+      console.log(`[Shopify Sync] Fetching page ${allProducts.length / 50 + 1}...`);
+      console.log(`[Shopify Sync] Original URL: ${currentUrl}`);
+      
+      let response;
+      let retries = 3;
+      
+      while (retries > 0) {
+        try {
+          response = await fetch(proxiedUrl, {
+            method: 'GET',
+            headers: {
+              'X-Shopify-Access-Token': store.token,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+          });
+          if (response.ok) break;
+          console.warn(`[Shopify Sync] Proxy returned status ${response.status}. Retrying...`);
+          if (response.status === 429 || response.status >= 500) {
+            retries--;
+            if (retries === 0) throw new Error(`Shopify API responded with status ${response.status}`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          throw new Error(`Shopify API responded with status ${response.status}`);
+        } catch (e: any) {
+          console.error(`[Shopify Sync] Fetch error: ${e.message}. Retrying...`);
+          retries--;
+          if (retries === 0) throw e;
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`Shopify API failed after retries`);
       }
 
       const data = await response.json();
