@@ -9,7 +9,8 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   Plus,
-  ArrowLeftRight
+  ArrowLeftRight,
+  RefreshCw
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -30,7 +31,7 @@ import { format } from 'date-fns';
 import { cn } from '../lib/utils';
 
 export default function Dashboard() {
-  const { products, transactions, loading, error } = useInventory();
+  const { products, transactions, loading, error, shopifySettings } = useInventory();
 
   const totalProducts = products.length;
   const totalStock = products.reduce((acc, p) => acc + p.quantity, 0);
@@ -44,9 +45,11 @@ export default function Dashboard() {
 
   const recentTransactions = transactions.slice(0, 5);
 
+  const activeStoresCount = shopifySettings?.filter(s => s.status === 'ACTIVE').length || 0;
+
   const stats = [
     { title: 'Total Products', value: totalProducts, icon: Package, color: 'text-foreground' },
-    { title: 'Total Stock', value: totalStock, icon: Boxes, color: 'text-foreground' },
+    { title: 'Synced Stores', value: activeStoresCount, icon: RefreshCw, color: 'text-emerald-500' },
     { title: 'Low Stock', value: lowStockItems, icon: AlertTriangle, color: 'text-amber-500' },
     { title: 'Out of Stock', value: outOfStockItems, icon: TrendingUp, color: 'text-rose-500' },
   ];

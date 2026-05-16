@@ -33,6 +33,11 @@ export interface ShopifyStoreConfig {
   domain: string;
   token: string;
   color?: string;
+  status?: 'ACTIVE' | 'FAILED' | 'PENDING';
+  connectedAt?: string;
+  lastSyncedAt?: string;
+  lastError?: string;
+  productsCount?: number;
 }
 
 export interface Category {

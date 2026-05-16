@@ -58,7 +58,7 @@ export function useInventory() {
     );
 
     const unsubProducts = onSnapshot(productsQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
       setProducts(data);
       setLoading(false);
       setError(null);
