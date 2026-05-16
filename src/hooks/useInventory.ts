@@ -14,7 +14,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Product, Category, Transaction } from '../types';
+import { Product, Category, Transaction, ShopifyStoreConfig } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
